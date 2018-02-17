@@ -97,7 +97,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if img.Bounds().Dx()%3 != 0 {
+		if img.Bounds().Dx()%2 != 0 {
 			log.Println("Image width must be a multiple of 2.")
 			os.Exit(1)
 		}
