@@ -115,8 +115,8 @@ var cc = template.Must(template.New("cc").Funcs(template.FuncMap{
 -- /___/  by 1lann - github.com/1lann/juroku
 --
 -- Usage:
--- local img = os.loadAPI("image")
--- img.draw(term) or img.draw(monitor)
+-- os.loadAPI("image")
+-- image.draw(term) or image.draw(monitor)
 
 local function decode(...)
 	local result = ""
