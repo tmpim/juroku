@@ -4,8 +4,14 @@ Juroku converts an image (PNG or JPG) into a Lua script that can be loaded as a
 ComputerCraft API to be used to draw on terminals and monitors.
 
 ## Building and Running
-1. `go get -u github.com/1lann/juroku/cmd/juroku`
-2. Find `juroku` in your `$GOPATH/bin` and run it.
+1.
+```
+# We need this security exception to allow the libimagequant to build.
+export CGO_CFLAGS_ALLOW=.*
+export CGO_LDFLAGS_ALLOW=.*
+```
+2. `go get -u github.com/1lann/juroku/cmd/juroku`
+3. Find `juroku` in your `$GOPATH/bin` and run it.
 
 TODO: Release pre-built binaries.
 
