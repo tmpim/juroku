@@ -93,7 +93,7 @@ func chunkToByte(chunk []byte) (b byte, textColor byte, bgColor byte) {
 var cc = template.Must(template.New("cc").Funcs(template.FuncMap{
 	"colorToHex": func(c color.Color) string {
 		r, g, b, _ := c.RGBA()
-		return fmt.Sprintf("%X%X%X", r>>8, g>>8, b>>8)
+		return fmt.Sprintf("%02X%02X%02X", r>>8, g>>8, b>>8)
 	},
 	"bToList": func(b []byte) string {
 		parts := make([]string, len(b))
