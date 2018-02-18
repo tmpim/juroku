@@ -4,9 +4,8 @@ Juroku converts an image (PNG or JPG) into a Lua script that can be loaded as a
 ComputerCraft API to be used to draw on terminals and monitors.
 
 ## Building and Running
-1.
+1. A cgo security exception is required to allow the libimagequant to build:
 ```
-# We need this security exception to allow the libimagequant to build.
 export CGO_CFLAGS_ALLOW=.*
 export CGO_LDFLAGS_ALLOW=.*
 ```
