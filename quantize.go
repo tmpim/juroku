@@ -9,17 +9,17 @@ import (
 
 // Quantize quantizes an image into a maximum of 16 colors with the given
 // parameters.
-func Quantize(img image.Image, speed int, dither float64) (image.Image, error) {
+func Quantize(ref, img image.Image, speed int, dither float64) (image.Image, error) {
 	attr, err := getAttributes(speed)
 	if err != nil {
 		return nil, fmt.Errorf("Attribues: %s", err.Error())
 	}
 	defer attr.Release()
 
-	quant, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(img),
-		img.Bounds().Dx(), img.Bounds().Dy(), 0)
+	quant, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(ref),
+		ref.Bounds().Dx(), ref.Bounds().Dy(), 0)
 	if err != nil {
-		return nil, fmt.Errorf("NewImage: %s", err.Error())
+		return nil, fmt.Errorf("ref NewImage: %s", err.Error())
 	}
 	defer quant.Release()
 
@@ -27,6 +27,15 @@ func Quantize(img image.Image, speed int, dither float64) (image.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Quantize: %s", err.Error())
 	}
+
+	outputImg, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(img),
+		img.Bounds().Dx(), img.Bounds().Dy(), 0)
+	if err != nil {
+		return nil, fmt.Errorf("img NewImage: %s", err.Error())
+	}
+	defer outputImg.Release()
+
+	res.SetOutputImage(outputImg)
 
 	err = res.SetDitheringLevel(float32(dither))
 	if err != nil {

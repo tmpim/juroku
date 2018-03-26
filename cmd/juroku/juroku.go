@@ -16,6 +16,7 @@ import (
 
 var (
 	outputPath  = flag.String("o", "image.lua", "set location of output script")
+	reference   = flag.String("r", "input_image", "set reference image to derive palette from")
 	previewPath = flag.String("p", "preview.png", "set location of output preview (will be PNG)")
 	speed       = flag.Int("q", 1, "set the processing speed/quality (1 = slowest, 10 = fastest)")
 	dither      = flag.Float64("d", 0.2, "set the amount of allowed dithering (0 = none, 1 = most)")
@@ -103,9 +104,29 @@ func main() {
 		}
 	}()
 
+	var refImage image.Image
+	if *reference == "input_image" {
+		refImage = img
+	} else {
+		func() {
+			input, err := os.Open(*reference)
+			if err != nil {
+				log.Println("Failed to open reference image:", err)
+				os.Exit(1)
+			}
+			defer input.Close()
+
+			refImage, _, err = image.Decode(input)
+			if err != nil {
+				log.Println("Failed to decode reference image:", err)
+				os.Exit(1)
+			}
+		}()
+	}
+
 	log.Println("Image loaded, quantizing...")
 
-	quant, err := juroku.Quantize(img, *speed, *dither)
+	quant, err := juroku.Quantize(refImage, img, *speed, *dither)
 	if err != nil {
 		log.Println("Failed to quantize image:", err)
 		os.Exit(1)
