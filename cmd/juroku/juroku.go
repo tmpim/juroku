@@ -10,12 +10,14 @@ import (
 	"os"
 	"time"
 
+	_ "golang.org/x/image/bmp"
+
 	"github.com/1lann/imagequant"
 	"github.com/1lann/juroku"
 )
 
 var (
-	outputPath  = flag.String("o", "image.lua", "set location of output script")
+	outputPath  = flag.String("o", "image.juf", "set location of output script")
 	reference   = flag.String("r", "input_image", "set reference image to derive palette from")
 	previewPath = flag.String("p", "preview.png", "set location of output preview (will be PNG)")
 	speed       = flag.Int("q", 1, "set the processing speed/quality (1 = slowest, 10 = fastest)")
