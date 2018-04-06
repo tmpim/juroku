@@ -6,7 +6,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/anthonynsimon/bild/effect"
+	"github.com/disintegration/gift"
 )
 
 // GetPalette returns the palette of the image.
@@ -50,7 +50,10 @@ func ChunkImage(img image.Image) (image.Image, error) {
 		return nil, errors.New("juroku: image height must be a multiple of 3")
 	}
 
-	edges := effect.Sobel(img)
+	edges := image.NewRGBA(img.Bounds())
+	gift.Sobel().Draw(edges, img, &gift.Options{
+		Parallelization: true,
+	})
 
 	output := image.NewRGBA(img.Bounds())
 

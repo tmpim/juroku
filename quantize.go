@@ -28,14 +28,16 @@ func Quantize(ref, img image.Image, speed int, dither float64) (image.Image, err
 		return nil, fmt.Errorf("Quantize: %s", err.Error())
 	}
 
-	outputImg, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(img),
-		img.Bounds().Dx(), img.Bounds().Dy(), 0)
-	if err != nil {
-		return nil, fmt.Errorf("img NewImage: %s", err.Error())
-	}
-	defer outputImg.Release()
+	if ref != img {
+		outputImg, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(img),
+			img.Bounds().Dx(), img.Bounds().Dy(), 0)
+		if err != nil {
+			return nil, fmt.Errorf("img NewImage: %s", err.Error())
+		}
+		defer outputImg.Release()
 
-	res.SetOutputImage(outputImg)
+		res.SetOutputImage(outputImg)
+	}
 
 	err = res.SetDitheringLevel(float32(dither))
 	if err != nil {
