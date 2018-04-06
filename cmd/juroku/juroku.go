@@ -5,7 +5,6 @@ import (
 	"image"
 	_ "image/jpeg"
 	"image/png"
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -142,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	code, err := juroku.GenerateCode(chunked)
+	frame, err := juroku.GenerateFrameChunk(chunked)
 	if err != nil {
 		log.Println("Failed to generate code:", err)
 		os.Exit(1)
@@ -152,6 +151,7 @@ func main() {
 		preview, err := os.Create(*previewPath)
 		if err != nil {
 			log.Println("Warning: Failed to create preview image:", err)
+			return
 		}
 
 		defer preview.Close()
@@ -162,10 +162,18 @@ func main() {
 		}
 	}()
 
-	err = ioutil.WriteFile(*outputPath, code, 0644)
+	output, err := os.Create(*outputPath)
+	if err != nil {
+		log.Println("Failed to create output file:", err)
+		return
+	}
+
+	defer output.Close()
+
+	err = frame.WriteTo(output)
 	if err != nil {
 		log.Println("Failed to write to output file:", err)
-		os.Exit(1)
+		return
 	}
 
 	log.Println("\nDone! That took " + time.Since(start).String() + ".")
