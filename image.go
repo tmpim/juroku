@@ -6,7 +6,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/disintegration/gift"
+	"github.com/anthonynsimon/bild/effect"
 )
 
 // GetPalette returns the palette of the image.
@@ -34,8 +34,8 @@ func GetPalette(img image.Image) color.Palette {
 }
 
 func getScore(edges image.Image, x, y int) float64 {
-	r, _, _, _ := edges.At(x, y).RGBA()
-	return math.Log(float64(r)+7.0)*0.65 + 0.45
+	r, g, b, _ := edges.At(x, y).RGBA()
+	return math.Log((float64(r)+float64(g)+float64(b))/3.0+7.0)*0.65 + 0.45
 }
 
 // ChunkImage chunks an image following the ComputerCraft requirements of
@@ -50,9 +50,7 @@ func ChunkImage(img image.Image) (image.Image, error) {
 		return nil, errors.New("juroku: image height must be a multiple of 3")
 	}
 
-	edges := image.NewRGBA(img.Bounds())
-	g := gift.New(gift.Sobel(), gift.Grayscale())
-	g.Draw(edges, img)
+	edges := effect.Sobel(img)
 
 	output := image.NewRGBA(img.Bounds())
 
