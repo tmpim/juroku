@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/1lann/dissonance/drivers/paudio"
 	"github.com/1lann/dissonance/ffmpeg"
-	"github.com/1lann/dissonance/filters/samplerate"
+	"github.com/1lann/juroku/dfpwm"
 )
 
 func main() {
@@ -20,16 +21,16 @@ func main() {
 		panic(err)
 	}
 
-	// p, _ := paudio.NewPlaybackDevice()
+	p, _ := paudio.NewPlaybackDevice()
 	// p.PlayStream(result)
 
-	// rd, wr := io.Pipe()
+	rd, wr := io.Pipe()
 
-	// go func() {
-	// 	dfpwm.EncodeDFPWM(wr, result)
-	// 	wr.Close()
-	// }()
-	// dec := dfpwm.NewDecoder(rd, 96000)
+	go func() {
+		dfpwm.EncodeDFPWM(wr, stream)
+		wr.Close()
+	}()
+	dec := dfpwm.NewDecoder(rd, 48000)
 
 	// file, err := os.Create("./outfile")
 	// if err != nil {
