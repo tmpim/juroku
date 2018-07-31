@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/1lann/juroku"
+	"github.com/tmpim/juroku"
 )
 
 func main() {

@@ -12,7 +12,7 @@ import (
 	_ "golang.org/x/image/bmp"
 
 	"github.com/1lann/imagequant"
-	"github.com/1lann/juroku"
+	"github.com/tmpim/juroku"
 )
 
 var (
@@ -30,7 +30,7 @@ func main() {
 
 	if *license {
 		log.Println("Juroku itself is licensed under the MIT license, which can be found here:")
-		log.Println("https://github.com/1lann/juroku/blob/master/LICENSE")
+		log.Println("https://github.com/tmpim/juroku/blob/master/LICENSE")
 		log.Println("However other portions of Juroku are under different licenses,")
 		log.Println("the information of which can be found below.")
 		log.Println(imagequant.License())

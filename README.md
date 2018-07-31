@@ -9,7 +9,7 @@ ComputerCraft API to be used to draw on terminals and monitors.
 export CGO_CFLAGS_ALLOW=.*
 export CGO_LDFLAGS_ALLOW=.*
 ```
-2. `go get -u github.com/1lann/juroku/cmd/juroku`
+2. `go get -u github.com/tmpim/juroku/cmd/juroku`
 3. Find `juroku` in your `$GOPATH/bin` and run it.
 
 TODO: Release pre-built binaries.
