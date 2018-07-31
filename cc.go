@@ -1,10 +1,13 @@
 package juroku
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"image/color"
 )
+
+var colorAlphabet = "0123456789abcdef"
 
 // GenerateFrameChunk generates a frame chunk for the given image.
 func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
@@ -24,6 +27,12 @@ func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
 	}
 
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 3 {
+		row := FrameRow{
+			TextColor:       new(bytes.Buffer),
+			BackgroundColor: new(bytes.Buffer),
+			Text:            new(bytes.Buffer),
+		}
+
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x += 2 {
 			chunk := make([]byte, 0, 6)
 			for dy := 0; dy < 3; dy++ {
@@ -34,11 +43,12 @@ func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
 			}
 
 			text, textColor, bgColor := chunkToBlit(chunk)
-			frame.Pixels = append(frame.Pixels, [2]byte{
-				textColor<<4 | bgColor,
-				text,
-			})
+			row.TextColor.WriteByte(colorAlphabet[textColor])
+			row.BackgroundColor.WriteByte(colorAlphabet[bgColor])
+			row.Text.WriteByte(text)
 		}
+
+		frame.Rows = append()
 	}
 
 	for i := range frame.Palette {

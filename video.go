@@ -20,12 +20,25 @@ import (
 
 // VideoChunk is composed of a Frame and Audio chunk.
 type VideoChunk struct {
-	Frame *FrameChunk
-	Audio AudioChunk
+	Frames []*FrameChunk
+	Audio  AudioChunk
 }
+
+// FrameSplitter splits an image into multiple frames for multiple monitors.
+type FrameSplitter func(img image.Image) []image.Image
 
 // AudioChunk represents a chunk of audio data.
 type AudioChunk []byte
+
+func (a AudioChunk) WriteTo(w io.Writer) error {
+	err := binary.Write(w, binary.BigEndian, uint32(len(a)))
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(a)
+	return err
+}
 
 type EncoderOptions struct {
 	Context     context.Context
@@ -36,6 +49,7 @@ type EncoderOptions struct {
 	Dither      float64
 	AudioBuffer time.Duration
 	Debug       bool
+	Splitter    FrameSplitter
 }
 
 func (e *EncoderOptions) validate() error {
@@ -82,7 +96,7 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 	cmd := exec.CommandContext(opts.Context,
 		"ffmpeg", "-i", "-", "-acodec", "pcm_s8",
 		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate),
-		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp", "-r", "20", "-vf",
+		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp", "-r", "5", "-vf",
 		"scale="+strconv.Itoa(opts.Width)+":"+strconv.Itoa(opts.Height),
 		"pipe:4")
 	cmd.Stdin = rd
@@ -119,16 +133,16 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 
 	inbox := make(chan frameJob, opts.Workers*2)
 	for i := 0; i < opts.Workers; i++ {
-		go jurokuWorker(inbox, opts.Speed, opts.Dither)
+		go jurokuWorker(inbox, opts.Splitter, opts.Speed, opts.Dither)
 	}
 
-	outputChan := make(chan chan frameOrError,
-		int((opts.AudioBuffer.Seconds()+1.0)*20.0))
+	outputChan := make(chan chan framesOrError,
+		int((opts.AudioBuffer.Seconds()+1.0)*100.0))
 
 	go decodeToWorkerPump(frameRd, inbox, outputChan, errChan)
 
 	// Prepare audio buffer.
-	stream := audio.NewOfflineStream(dfpwm.SampleRate)
+	stream := audio.NewOfflineStream(dfpwm.SampleRate, dfpwm.SampleRate/4)
 	go func() {
 		defer stream.Close()
 
@@ -159,7 +173,7 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		select {
 		case err := <-errChan:
-			return fmt.Errorf("juroku: EncodeVideo: failed to read initial audio buffer: %v", err)
+			return err
 		default:
 		}
 	} else if err != nil {
@@ -167,8 +181,8 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 	}
 
 	output <- VideoChunk{
-		Frame: nil,
-		Audio: initialBuffer[:n],
+		Frames: nil,
+		Audio:  initialBuffer[:n],
 	}
 
 	// Drain the outputs.
@@ -195,15 +209,15 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 				return fmt.Errorf("juroku: EncodeVideo: frame encode error: %v", err)
 			}
 
-			frameAudio := make([]byte, dfpwm.SampleRate/8/20)
+			frameAudio := make([]byte, dfpwm.SampleRate/160)
 			n, err := io.ReadFull(dfpwmRd, frameAudio)
-			if err != nil && err != io.EOF {
+			if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 				return fmt.Errorf("juroku: EncodeVideo: audio encode error: %v", err)
 			}
 
 			output <- VideoChunk{
-				Frame: frame.frame,
-				Audio: frameAudio[:n],
+				Frames: frame.frames,
+				Audio:  frameAudio[:n],
 			}
 		case err := <-errChan:
 			return fmt.Errorf("juroku: EncodeVideo: pump error: %v", err)
@@ -212,11 +226,11 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 }
 
 func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
-	outputChan chan chan frameOrError, errChan chan error) {
-	for {
-		defer close(inbox)
-		defer close(outputChan)
+	outputChan chan chan framesOrError, errChan chan error) {
+	defer close(inbox)
+	defer close(outputChan)
 
+	for {
 		img, err := bmp.Decode(frameRd)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return
@@ -225,7 +239,7 @@ func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
 			return
 		}
 
-		frameOutput := make(chan frameOrError, 1)
+		frameOutput := make(chan framesOrError, 1)
 		outputChan <- frameOutput
 
 		inbox <- frameJob{
@@ -235,36 +249,44 @@ func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
 	}
 }
 
-type frameOrError struct {
-	frame *FrameChunk
-	err   error
+type framesOrError struct {
+	frames []*FrameChunk
+	err    error
 }
 
 type frameJob struct {
 	img    image.Image
-	output chan<- frameOrError
+	output chan<- framesOrError
 }
 
-func jurokuWorker(inbox <-chan frameJob, speed int, dither float64) {
+func jurokuWorker(inbox <-chan frameJob, splitter FrameSplitter,
+	speed int, dither float64) {
 	for job := range inbox {
-		quant, err := Quantize(job.img, job.img, speed, dither)
-		if err != nil {
-			job.output <- frameOrError{err: err}
-			return
+		imgs := splitter(job.img)
+
+		var frames []*FrameChunk
+		for _, img := range imgs {
+			quant, err := Quantize(img, img, speed, dither)
+			if err != nil {
+				job.output <- framesOrError{err: err}
+				return
+			}
+
+			chunked, err := ChunkImage(quant)
+			if err != nil {
+				job.output <- framesOrError{err: err}
+				return
+			}
+
+			frame, err := GenerateFrameChunk(chunked)
+			if err != nil {
+				job.output <- framesOrError{err: err}
+				return
+			}
+
+			frames = append(frames, frame)
 		}
 
-		chunked, err := ChunkImage(quant)
-		if err != nil {
-			job.output <- frameOrError{err: err}
-			return
-		}
-
-		frame, err := GenerateFrameChunk(chunked)
-		if err != nil {
-			job.output <- frameOrError{err: err}
-			return
-		}
-
-		job.output <- frameOrError{frame: frame}
+		job.output <- framesOrError{frames: frames}
 	}
 }

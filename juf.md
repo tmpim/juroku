@@ -33,7 +33,8 @@ It is RECOMMENDED to use EOF for indication of the end of a stream, or a
 simulated EOF. If this is
 not possible, 8 zero bytes (`0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00`)
 MAY be used instead. All chunk decoders SHOULD detect this and terminate if an
-EOF is present, although there are some exceptions in the rule detailed below.
+EOF is present, although there are some exceptions in the rule detailed in their
+relevant chunks below.
 
 ## Version
 This specification details version 1 of the JUF format, thus in order to fufil
@@ -45,13 +46,32 @@ values:
 - `1`: static image
 - `2`: video with audio
 - `3`: video without audio
-- `4`: only audio
+
+## Multi-monitor Chunk
+```
++-----------------------------+
+| Number of monitors (1 byte) |
++-----------------------------+
+```
+
+A multi-monitor chunk is used for all types except for type `4` and it
+MUST be present directly after the global header. It specifies
+the number of multiple visual streams for multiple monitors. The number
+of monitors can be arbitrary, although their positions are defined by the
+configuration of the Juroku encoder and decoder.
+
+A value of 0 is permitted to repsent no visual data, for cases like audio
+only data.
+
+The number of monitors determines the number of frame chunks that MUST appear
+together in groups whenever frame data is present, representing the number of
+frame channels for each monitor.
 
 ## Frame Chunk
 ```
 Overall structure of a frame chunk:
 +------------------+-----------------------------------+--------------------+
-| Header (4 bytes) | Pixels (width * height * 2 bytes) | Palette (48 bytes) |
+| Header (4 bytes) | Pixels (width * height * 2 bytes) | Palette (48 bytes) | Repeats for multi-monitor...
 +------------------+-----------------------------------+--------------------+
 ```
 A frame chunk is the what the video data will primarily consist of, and is also
@@ -60,8 +80,11 @@ contains the height and width of the frame,
 character, background color, text color, and palette that is used for a
 single frame.
 
-For JUF types `2` and `4`, a single frame chunk MUST be present after an
+For JUF type `2`, a single group of frame chunks MUST be present after an
 audio chunk with the exception of the final audio chunk.
+
+Frame chunks MUST appear in groups for the number of monitors there are present
+as defined by the multi-monitor chunk, representing each monitor channel.
 
 ### Header
 ```
@@ -114,8 +137,9 @@ scenarios, namely ONLY if the JUF type is `2` or `4`, all other types
 MUST not have any audio chunks.
 
 If the JUF type is `2` or `4`, there MUST be an initial audio chunk
-that occurs after the global header. It is RECOMMENDED that the initial
-length is 1 minute worth of samples (2,880,000 samples or 360 kB).
+that occurs after the multi-monitor chunk in the case of type `2`, and
+the global header in the case of type `4`. It is RECOMMENDED that the initial
+length is at least 1 minute worth of samples (2,880,000 samples or 360 kB).
 This is because Computronics tapes are played in a streaming manner by
 swapping between tapes and require a short 0.2s audio glitch when switching,
 and 1 minute is an ideal length to swap between tapes. Increasing this value
