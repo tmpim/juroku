@@ -9,30 +9,6 @@ import (
 	"github.com/disintegration/gift"
 )
 
-// GetPalette returns the palette of the image.
-func GetPalette(img image.Image) color.Palette {
-	colors := make(map[color.RGBA]bool)
-
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			r, g, b, a := img.At(x, y).RGBA()
-			colors[color.RGBA{
-				R: uint8(r >> 8),
-				G: uint8(g >> 8),
-				B: uint8(b >> 8),
-				A: uint8(a >> 8),
-			}] = true
-		}
-	}
-
-	var palette color.Palette
-	for col := range colors {
-		palette = append(palette, col)
-	}
-
-	return palette
-}
-
 func getScore(edges image.Image, x, y int) float64 {
 	r, g, b, _ := edges.At(x, y).RGBA()
 	return math.Log((float64(r)+float64(g)+float64(b))/3.0+7.0)*0.65 + 0.45

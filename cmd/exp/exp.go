@@ -15,14 +15,14 @@ type subImagable interface {
 }
 
 func main() {
-	file, err := os.Open("./loli_dance.webm")
+	file, err := os.Open("./disco.mkv")
 	if err != nil {
 		panic(err)
 	}
 
 	defer file.Close()
 
-	of, err := os.Create("./dance.juf")
+	of, err := os.Create("./disco.juf")
 	if err != nil {
 		panic(err)
 	}

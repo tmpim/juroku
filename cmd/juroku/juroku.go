@@ -127,7 +127,7 @@ func main() {
 
 	log.Println("Image loaded, quantizing...")
 
-	quant, err := juroku.Quantize(refImage, img, *speed, *dither)
+	quant, _, err := juroku.Quantize(refImage, img, *speed, *dither)
 	if err != nil {
 		log.Println("Failed to quantize image:", err)
 		os.Exit(1)
@@ -141,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	frame, err := juroku.GenerateFrameChunk(chunked)
+	frame, err := juroku.GenerateFrameChunk(chunked, palette)
 	if err != nil {
 		log.Println("Failed to generate code:", err)
 		os.Exit(1)

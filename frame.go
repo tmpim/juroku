@@ -2,7 +2,6 @@ package juroku
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"image/color"
 	"io"
@@ -10,15 +9,21 @@ import (
 
 // FrameRow represents a row in a frame chunk.
 type FrameRow struct {
-	TextColor       *bytes.Buffer
-	BackgroundColor *bytes.Buffer
-	Text            *bytes.Buffer
+	BackgroundColor []byte
+	Text            []byte
+	Color           []byte
 }
 
 // WriteTo writes the frame row to a writer.
 func (f *FrameRow) WriteTo(wr io.Writer) (int, error) {
 	total := 0
-	n, err := wr.Write(f.TextColor)
+	n, err := wr.Write(f.Text)
+	total += n
+	if err != nil {
+		return total, err
+	}
+
+	n, err = wr.Write(f.Color)
 	total += n
 	if err != nil {
 		return total, err
@@ -30,11 +35,7 @@ func (f *FrameRow) WriteTo(wr io.Writer) (int, error) {
 		return total, err
 	}
 
-	n, err = wr.Write(f.Text)
-	total += n
-	if err != nil {
-		return total, err
-	}
+	return total, nil
 }
 
 // FrameChunk represents a frame chunk.
@@ -42,7 +43,7 @@ type FrameChunk struct {
 	Width  int
 	Height int
 
-	Rows []FrameRow
+	Rows []*FrameRow
 
 	Palette [16]color.RGBA
 }

@@ -1,7 +1,6 @@
 package juroku
 
 import (
-	"bytes"
 	"errors"
 	"image"
 	"image/color"
@@ -10,8 +9,7 @@ import (
 var colorAlphabet = "0123456789abcdef"
 
 // GenerateFrameChunk generates a frame chunk for the given image.
-func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
-	palette := GetPalette(img)
+func GenerateFrameChunk(img image.Image, palette color.Palette) (*FrameChunk, error) {
 	if len(palette) > 16 {
 		return nil, errors.New("juroku: GenerateFrameChunk: palette must have <= 16 colors")
 	}
@@ -27,11 +25,7 @@ func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
 	}
 
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y += 3 {
-		row := FrameRow{
-			TextColor:       new(bytes.Buffer),
-			BackgroundColor: new(bytes.Buffer),
-			Text:            new(bytes.Buffer),
-		}
+		row := FrameRow{}
 
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x += 2 {
 			chunk := make([]byte, 0, 6)
@@ -43,12 +37,13 @@ func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
 			}
 
 			text, textColor, bgColor := chunkToBlit(chunk)
-			row.TextColor.WriteByte(colorAlphabet[textColor])
-			row.BackgroundColor.WriteByte(colorAlphabet[bgColor])
-			row.Text.WriteByte(text)
+
+			row.Color = append(row.Color, colorAlphabet[textColor])
+			row.BackgroundColor = append(row.BackgroundColor, colorAlphabet[bgColor])
+			row.Text = append(row.Text, text)
 		}
 
-		frame.Rows = append()
+		frame.Rows = append(frame.Rows, &row)
 	}
 
 	for i := range frame.Palette {
@@ -75,10 +70,6 @@ func chunkToBlit(chunk []byte) (char byte, textColor byte, bgColor byte) {
 		} else {
 			b |= 0 << i
 		}
-	}
-
-	if textColor == 0 {
-		textColor = '0'
 	}
 
 	char = b + 128

@@ -16,6 +16,8 @@ import (
 	"github.com/1lann/dissonance/audio"
 	"github.com/1lann/juroku/dfpwm"
 	"golang.org/x/image/bmp"
+
+	_ "image/png"
 )
 
 // VideoChunk is composed of a Frame and Audio chunk.
@@ -96,7 +98,7 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 	cmd := exec.CommandContext(opts.Context,
 		"ffmpeg", "-i", "-", "-acodec", "pcm_s8",
 		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate),
-		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp", "-r", "5", "-vf",
+		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp", "-r", "10", "-vf",
 		"scale="+strconv.Itoa(opts.Width)+":"+strconv.Itoa(opts.Height),
 		"pipe:4")
 	cmd.Stdin = rd
@@ -160,10 +162,10 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			dfpwmWr.Close()
 			return
-		} else {
-			dfpwmWr.CloseWithError(err)
-			return
 		}
+
+		dfpwmWr.CloseWithError(err)
+		return
 	}()
 
 	// Buffer the initial audio.
@@ -266,7 +268,7 @@ func jurokuWorker(inbox <-chan frameJob, splitter FrameSplitter,
 
 		var frames []*FrameChunk
 		for _, img := range imgs {
-			quant, err := Quantize(img, img, speed, dither)
+			quant, palette, err := Quantize(img, img, speed, dither)
 			if err != nil {
 				job.output <- framesOrError{err: err}
 				return
@@ -278,7 +280,7 @@ func jurokuWorker(inbox <-chan frameJob, splitter FrameSplitter,
 				return
 			}
 
-			frame, err := GenerateFrameChunk(chunked)
+			frame, err := GenerateFrameChunk(chunked, palette)
 			if err != nil {
 				job.output <- framesOrError{err: err}
 				return
