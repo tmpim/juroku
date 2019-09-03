@@ -18,23 +18,25 @@ type FrameRow struct {
 // WriteTo writes the frame row to a writer.
 func (f *FrameRow) WriteTo(wr io.Writer) (int, error) {
 	total := 0
-	n, err := wr.Write(f.TextColor)
+	n, err := wr.Write(f.TextColor.Bytes())
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	n, err = wr.Write(f.BackgroundColor)
+	n, err = wr.Write(f.BackgroundColor.Bytes())
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	n, err = wr.Write(f.Text)
+	n, err = wr.Write(f.Text.Bytes())
 	total += n
 	if err != nil {
 		return total, err
 	}
+
+	return total, nil
 }
 
 // FrameChunk represents a frame chunk.

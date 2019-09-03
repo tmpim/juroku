@@ -48,7 +48,7 @@ func GenerateFrameChunk(img image.Image) (*FrameChunk, error) {
 			row.Text.WriteByte(text)
 		}
 
-		frame.Rows = append()
+		frame.Rows = append(frame.Rows, row)
 	}
 
 	for i := range frame.Palette {
