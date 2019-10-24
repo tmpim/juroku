@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"sort"
 
 	"github.com/disintegration/gift"
 )
@@ -34,8 +35,8 @@ func GetPalette(img image.Image) color.Palette {
 }
 
 func getScore(edges image.Image, x, y int) float64 {
-	r, g, b, _ := edges.At(x, y).RGBA()
-	return math.Log((float64(r)+float64(g)+float64(b))/3.0+7.0)*0.65 + 0.45
+	r, _, _, _ := edges.At(x, y).RGBA()
+	return math.Log(float64(r)+7.0)*0.65 + 0.45
 }
 
 // ChunkImage chunks an image following the ComputerCraft requirements of
@@ -51,9 +52,8 @@ func ChunkImage(img image.Image) (image.Image, error) {
 	}
 
 	edges := image.NewRGBA(img.Bounds())
-	gift.Sobel().Draw(edges, img, &gift.Options{
-		Parallelization: true,
-	})
+	g := gift.New(gift.Sobel(), gift.Grayscale())
+	g.Draw(edges, img)
 
 	output := image.NewRGBA(img.Bounds())
 
@@ -71,7 +71,13 @@ func ChunkImage(img image.Image) (image.Image, error) {
 
 			for dy := 0; dy < 3; dy++ {
 				for dx := 0; dx < 2; dx++ {
-					col := img.At(x+dx, y+dy).(color.RGBA)
+					r, g, b, a := img.At(x+dx, y+dy).RGBA()
+					col := color.RGBA{
+						R: uint8(r >> 8),
+						G: uint8(g >> 8),
+						B: uint8(b >> 8),
+						A: uint8(a >> 8),
+					}
 					pixels = append(pixels, pixel{
 						color: col,
 						image: img,
@@ -87,21 +93,15 @@ func ChunkImage(img image.Image) (image.Image, error) {
 				weight float64
 			}
 
-			var max colorCount
-			var secondMax colorCount
-
+			var aggrPixels []colorCount
 			for k, v := range pixelScore {
-				if v > max.weight {
-					secondMax = max
-					max.weight = v
-					max.color = k
-				} else if v > secondMax.weight {
-					secondMax.weight = v
-					secondMax.color = k
-				}
+				aggrPixels = append(aggrPixels, colorCount{
+					color:  k,
+					weight: v,
+				})
 			}
 
-			if len(pixelScore) <= 2 {
+			if len(aggrPixels) < 3 {
 				// we're gucci
 				for _, pix := range pixels {
 					output.Set(pix.x, pix.y, pix.color)
@@ -109,15 +109,18 @@ func ChunkImage(img image.Image) (image.Image, error) {
 				continue
 			}
 
-			palette := color.Palette{
-				max.color,
-				secondMax.color,
-			}
+			sort.Slice(aggrPixels, func(i int, j int) bool {
+				return aggrPixels[i].weight > aggrPixels[j].weight
+			})
 
 			for _, pix := range pixels {
-				if pix.color != max.color &&
-					pix.color != secondMax.color {
-					output.Set(pix.x, pix.y, palette.Convert(pix.color))
+				if pix.color != aggrPixels[0].color &&
+					pix.color != aggrPixels[1].color {
+					output.Set(pix.x, pix.y,
+						color.Palette{
+							aggrPixels[0].color,
+							aggrPixels[1].color,
+						}.Convert(pix.color))
 				} else {
 					output.Set(pix.x, pix.y, pix.color)
 				}
