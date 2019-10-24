@@ -7,7 +7,7 @@ local typeVideo = 2
 local typeVideoNoAudio = 3
 local typeAudio = 4
 
-local frameRate = 10
+local frameRate = 20
 local dataRate = 48000 / 8
 local startDelay = 1.25 * dataRate
 
@@ -234,6 +234,8 @@ function Decoder:drawFrame()
 			t("setCursorPos", 1, row)
 			t("blit", data[1], data[2], data[3])
 		end
+
+
 	end
 
 	-- os.queueEvent("juroku_frame")
@@ -350,9 +352,10 @@ function Decoder:playVideo()
 
 
 		-- print("drawing frame")
-		sleep(0.1)
-		self:drawFrame()
 		-- sleep(0)
+
+		self:drawFrame()
+		sleep(0)
 
 		-- os.queueEvent("juroku_frame")
 		-- coroutine.yield()
@@ -362,7 +365,8 @@ end
 
 function Decoder:render()
 	if self.type == typeImage then
-		drawFrame(0)
+		self:loadFrame(0, false)
+		self:drawFrame()
 		return
 	elseif self.type == typeVideo then
 		self:playVideo()

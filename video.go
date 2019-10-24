@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/1lann/dissonance/audio"
-	"github.com/1lann/juroku/dfpwm"
+	"github.com/tmpim/juroku/dfpwm"
 	"golang.org/x/image/bmp"
 
 	_ "image/png"

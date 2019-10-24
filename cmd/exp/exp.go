@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/1lann/juroku"
+	"github.com/tmpim/juroku"
 )
 
 type subImagable interface {
@@ -15,14 +15,14 @@ type subImagable interface {
 }
 
 func main() {
-	file, err := os.Open("./disco.mkv")
+	file, err := os.Open("./badapple.mkv")
 	if err != nil {
 		panic(err)
 	}
 
 	defer file.Close()
 
-	of, err := os.Create("./disco.juf")
+	of, err := os.Create("./badapple.juf")
 	if err != nil {
 		panic(err)
 	}
@@ -48,11 +48,13 @@ func main() {
 	}()
 
 	log.Println("result:", juroku.EncodeVideo(file, output, juroku.EncoderOptions{
-		Context:     context.Background(),
-		Width:       665,
-		Height:      366,
-		Workers:     8,
-		Speed:       10,
+		Context: context.Background(),
+		Width:   665,
+		Height:  366,
+		// Width:       328,
+		// Height:      177,
+		Workers:     32,
+		Speed:       5,
 		Dither:      0.2,
 		AudioBuffer: time.Second * 120,
 		Debug:       true,

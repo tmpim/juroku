@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/1lann/juroku"
+	"github.com/tmpim/juroku"
 
 	_ "image/png"
 )

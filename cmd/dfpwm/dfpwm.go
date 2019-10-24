@@ -7,7 +7,7 @@ import (
 
 	"github.com/1lann/dissonance/drivers/paudio"
 	"github.com/1lann/dissonance/ffmpeg"
-	"github.com/1lann/juroku/dfpwm"
+	"github.com/tmpim/juroku/dfpwm"
 )
 
 func main() {

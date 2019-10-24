@@ -12,7 +12,7 @@ import (
 	_ "golang.org/x/image/bmp"
 
 	"github.com/1lann/imagequant"
-	"github.com/1lann/juroku"
+	"github.com/tmpim/juroku"
 )
 
 var (
@@ -127,7 +127,7 @@ func main() {
 
 	log.Println("Image loaded, quantizing...")
 
-	quant, _, err := juroku.Quantize(refImage, img, *speed, *dither)
+	quant, palette, err := juroku.Quantize(refImage, img, *speed, *dither)
 	if err != nil {
 		log.Println("Failed to quantize image:", err)
 		os.Exit(1)
@@ -169,6 +169,8 @@ func main() {
 	}
 
 	defer output.Close()
+
+	output.Write(append([]byte("JUF"), []byte{1, 1, 1}...))
 
 	err = frame.WriteTo(output)
 	if err != nil {
