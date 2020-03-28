@@ -1,0 +1,13 @@
+github.com/1lann/dissonance v0.0.0-20180412140404-f93e50304fa9 h1:9YoeyXDtrpalxDsmM6ZrACVPkxVD5SrT5uFhwC79bC0=
+github.com/1lann/dissonance v0.0.0-20180412140404-f93e50304fa9/go.mod h1:RS5OndDSAGeF7yrHUzrDGfWVbKEES5BO782QOqvEzcA=
+github.com/1lann/imagequant v0.0.0-20180420212259-54760a3b63c2 h1:gaiNfljQH2M427HSjqyN6EDnnBYDkAgYHDSVv683FBo=
+github.com/1lann/imagequant v0.0.0-20180420212259-54760a3b63c2/go.mod h1:niL1BTeAGbJfAIiGCOi++7jrlxpAMXlCoDHUCYDj1+E=
+github.com/disintegration/gift v1.2.1 h1:Y005a1X4Z7Uc+0gLpSAsKhWi4qLtsdEcMIbbdvdZ6pc=
+github.com/disintegration/gift v1.2.1/go.mod h1:Jh2i7f7Q2BM7Ezno3PhfezbR1xpUg9dUg3/RlKGr4HI=
+github.com/gordonklaus/portaudio v0.0.0-20180817120803-00e7307ccd93 h1:TSG+DyZBnazM22ZHyHLeUkzM34ClkJRjIWHTq4btvek=
+github.com/gordonklaus/portaudio v0.0.0-20180817120803-00e7307ccd93/go.mod h1:HfYnZi/ARQKG0dwH5HNDmPCHdLiFiBf+SI7DbhW7et4=
+golang.org/x/image v0.0.0-20200119044424-58c23975cae1 h1:5h3ngYt7+vXCDZCup/HkCQgW5XwmSvR/nA2JmJ0RErg=
+golang.org/x/image v0.0.0-20200119044424-58c23975cae1/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
+golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a h1:WXEvlFVvvGxCJLG6REjsT03iWnKLEWinaScsxF2Vm2o=
+golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

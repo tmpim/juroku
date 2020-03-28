@@ -15,14 +15,14 @@ type subImagable interface {
 }
 
 func main() {
-	file, err := os.Open("./badapple.mkv")
+	file, err := os.Open("./input.mkv")
 	if err != nil {
 		panic(err)
 	}
 
 	defer file.Close()
 
-	of, err := os.Create("./badapple.juf")
+	of, err := os.Create("./output.juf")
 	if err != nil {
 		panic(err)
 	}
@@ -53,11 +53,10 @@ func main() {
 		Height:  366,
 		// Width:       328,
 		// Height:      177,
-		Workers:     32,
-		Speed:       5,
-		Dither:      0.2,
-		AudioBuffer: time.Second * 120,
-		Debug:       true,
+		Workers: 32,
+		Speed:   10,
+		Dither:  0.2,
+		Debug:   true,
 		Splitter: func(img image.Image) []image.Image {
 			sub := img.(subImagable)
 			return []image.Image{

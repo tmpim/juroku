@@ -9,13 +9,13 @@ import (
 
 // FrameRow represents a row in a frame chunk.
 type FrameRow struct {
-	BackgroundColor []byte
-	Text            []byte
-	Color           []byte
+	BgColor   []byte
+	TextColor []byte
+	Text      []byte
 }
 
 // WriteTo writes the frame row to a writer.
-func (f *FrameRow) WriteTo(wr io.Writer) (int, error) {
+func (f FrameRow) WriteTo(wr io.Writer) (int, error) {
 	total := 0
 	n, err := wr.Write(f.Text)
 	total += n
@@ -23,13 +23,13 @@ func (f *FrameRow) WriteTo(wr io.Writer) (int, error) {
 		return total, err
 	}
 
-	n, err = wr.Write(f.Color)
+	n, err = wr.Write(f.TextColor)
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	n, err = wr.Write(f.BackgroundColor)
+	n, err = wr.Write(f.BgColor)
 	total += n
 	if err != nil {
 		return total, err
@@ -43,7 +43,7 @@ type FrameChunk struct {
 	Width  int
 	Height int
 
-	Rows []*FrameRow
+	Rows []FrameRow
 
 	Palette [16]color.RGBA
 }
