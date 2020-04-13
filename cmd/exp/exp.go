@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/tmpim/juroku"
 )
 
@@ -15,6 +18,8 @@ type subImagable interface {
 }
 
 func main() {
+	go http.ListenAndServe(":9999", nil)
+
 	file, err := os.Open("./input.mkv")
 	if err != nil {
 		panic(err)
@@ -53,7 +58,7 @@ func main() {
 		Height:  366,
 		// Width:       328,
 		// Height:      177,
-		Workers: 32,
+		Workers: 6,
 		Speed:   10,
 		Dither:  0.2,
 		Debug:   true,

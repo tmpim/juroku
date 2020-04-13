@@ -130,23 +130,27 @@ func (d *Decoder) SampleRate() int {
 	return d.sampleRate
 }
 
+type encodeDFPWMState struct {
+	response int
+	level    int
+	lastBit  bool
+}
+
 // EncodeDFPWM encodes the given stream into output using DFPWM.
 func EncodeDFPWM(output io.Writer, stream audio.Stream) error {
 	if stream.SampleRate() != SampleRate {
 		return errors.New("dfpwm: sample rate must be 48000 Hz")
 	}
 
-	response := 0
-	level := 0
-	lastBit := false
+	st := encodeDFPWMState{}
 
-	input := make([]int8, 8)
+	input := make([]int8, 1024)
 	w := bufio.NewWriter(output)
 	defer w.Flush()
 
 	for {
 		count := 0
-		for count < 8 {
+		for count < 1024 {
 			n, err := stream.Read(input[count:])
 			if err == io.EOF {
 				return nil
@@ -156,20 +160,42 @@ func EncodeDFPWM(output io.Writer, stream audio.Stream) error {
 			count += n
 		}
 
+		w.Write(st.Encode(input))
+	}
+}
+
+// OneOffEncodeDFPWM encodes the given raw PCM data, one-off. len(data) must be
+// a multiple of 8. Note that the encoder state is reset on each call,
+// only use this if you know what you're doing, otherwise use EncodeDFPWM.
+func OneOffEncodeDFPWM(data []int8) []byte {
+	return (&encodeDFPWMState{}).Encode(data)
+}
+
+func (st *encodeDFPWMState) Encode(data []int8) []byte {
+	if len(data)%8 != 0 {
+		panic("dfpwm: encode: size must be a multiple of 8")
+	}
+
+	out := make([]byte, 0, len(data)/8)
+
+	for len(data) > 0 {
 		var b byte
 
-		for _, in := range input {
-			bit := int(in) > level || (int(in) == level && level == 127)
+		for i := 0; i < 8; i++ {
+			bit := int(data[i]) > st.level || (int(data[i]) == st.level && st.level == 127)
 			b >>= 1
 			if bit {
 				b += 128
 			}
-			level, response = iterate(bit, lastBit, level, response)
-			lastBit = bit
+			st.level, st.response = iterate(bit, st.lastBit, st.level, st.response)
+			st.lastBit = bit
 		}
 
-		w.WriteByte(b)
+		out = append(out, b)
+		data = data[8:]
 	}
+
+	return out
 }
 
 func abs(a int) int {

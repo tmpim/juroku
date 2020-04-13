@@ -55,12 +55,12 @@ func (f *FrameChunk) WriteTo(w io.Writer) error {
 	binary.Write(wr, binary.BigEndian, uint16(f.Width))
 	binary.Write(wr, binary.BigEndian, uint16(f.Height))
 
-	for _, row := range f.Rows {
-		row.WriteTo(wr)
-	}
-
 	for _, color := range f.Palette {
 		wr.Write([]byte{color.R, color.G, color.B})
+	}
+
+	for _, row := range f.Rows {
+		row.WriteTo(wr)
 	}
 
 	return wr.Flush()

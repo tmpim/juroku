@@ -8,6 +8,7 @@ import (
 	"image"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -46,14 +47,16 @@ func (a AudioChunk) WriteTo(w io.Writer) error {
 }
 
 type EncoderOptions struct {
-	Context  context.Context
-	Width    int
-	Height   int
-	Workers  int
-	Speed    int
-	Dither   float64
-	Debug    bool
-	Splitter FrameSplitter
+	Context             context.Context
+	Width               int
+	Height              int
+	Workers             int
+	Speed               int
+	Dither              float64
+	Debug               bool
+	Realtime            bool
+	GroupAudioNumFrames int
+	Splitter            FrameSplitter
 }
 
 func (e *EncoderOptions) validate() error {
@@ -72,7 +75,7 @@ func (e *EncoderOptions) validate() error {
 
 // EncodeVideo encodes the video from the given reader which can be of any
 // format that FFMPEG supports, into the output.
-func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
+func EncodeVideo(input interface{}, output chan<- VideoChunk,
 	opts EncoderOptions) error {
 	if err := opts.validate(); err != nil {
 		return err
@@ -96,14 +99,37 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 		})
 	}
 
-	cmd := exec.CommandContext(opts.Context,
-		"ffmpeg", "-i", "-", "-acodec", "pcm_s8",
-		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate),
+	chanBufSize := opts.Workers * 2
+	if opts.GroupAudioNumFrames > opts.Workers {
+		chanBufSize = opts.GroupAudioNumFrames * 2
+	}
+
+	filename := "-"
+	if parsedFilename, ok := input.(string); ok {
+		filename = parsedFilename
+	}
+
+	var args []string
+	if opts.Realtime {
+		args = append(args, "-re")
+	}
+
+	args = append(args, "-f", "lavfi", "-i", "anullsrc", "-probesize", "32", "-analyzeduration", "0",
+		"-i", filename, "-acodec", "pcm_s8",
+		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate), "-af", "lowpass=f=10000",
 		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp",
 		"-r", strconv.Itoa(Framerate), "-vf",
 		"scale="+strconv.Itoa(opts.Width)+":"+strconv.Itoa(opts.Height),
+		"-fflags", "nobuffer", "-flags", "low_delay",
+		"-strict", "experimental",
 		"pipe:4")
-	cmd.Stdin = rd
+
+	eg, egCtx := errgroup.WithContext(opts.Context)
+
+	cmd := exec.CommandContext(egCtx, "ffmpeg", args...)
+	if filename == "-" {
+		cmd.Stdin = input.(io.Reader)
+	}
 	cmd.ExtraFiles = []*os.File{audioWr, frameWr}
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
@@ -123,22 +149,23 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 		go io.Copy(ioutil.Discard, stdErr)
 	}
 
-	eg, egCtx := errgroup.WithContext(opts.Context)
-
 	eg.Go(func() error {
+		defer log.Println("cmd.Wait is quitting")
+		defer stop()
 		return cmd.Wait()
 	})
 
-	inbox := make(chan frameJob, opts.Workers*3)
+	inbox := make(chan frameJob, chanBufSize)
 	for i := 0; i < opts.Workers; i++ {
 		eg.Go(func() error {
 			return jurokuWorker(inbox, opts.Splitter, opts.Speed, opts.Dither)
 		})
 	}
 
-	outputChan := make(chan chan []*FrameChunk, opts.Workers*3)
+	outputChan := make(chan chan []*FrameChunk, chanBufSize)
 
 	eg.Go(func() error {
+		defer log.Println("decodeToWorkerPump is quitting")
 		return decodeToWorkerPump(frameRd, inbox, outputChan)
 	})
 
@@ -146,6 +173,7 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 	stream := audio.NewOfflineStream(dfpwm.SampleRate, dfpwm.SampleRate/4)
 
 	eg.Go(func() error {
+		defer log.Println("audio stream is quitting")
 		defer stream.Close()
 		err := stream.ReadBytes(audioRd, binary.BigEndian, audio.Int8)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -159,42 +187,81 @@ func EncodeVideo(rd io.Reader, output chan<- VideoChunk,
 
 	dfpwmRd, dfpwmWr := io.Pipe()
 	eg.Go(func() error {
-		err := dfpwm.EncodeDFPWM(dfpwmWr, stream)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			dfpwmWr.Close()
-			return nil
+		defer log.Println("EncodeDFPWM is quitting")
+
+		if opts.GroupAudioNumFrames == 0 {
+			log.Println("standard encode")
+			err := dfpwm.EncodeDFPWM(dfpwmWr, stream)
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				dfpwmWr.Close()
+				return nil
+			}
+
+			dfpwmWr.CloseWithError(err)
+			return err
 		}
 
-		dfpwmWr.CloseWithError(err)
-		return err
+		input := make([]int8, (dfpwm.SampleRate/Framerate)*opts.GroupAudioNumFrames)
+
+		for {
+			count := 0
+			for count < len(input) {
+				n, err := stream.Read(input[count:])
+				if err == io.EOF {
+					dfpwmWr.Close()
+					return nil
+				} else if err != nil {
+					dfpwmWr.CloseWithError(err)
+					return err
+				}
+				count += n
+			}
+
+			paddedInput := append(input, make([]int8, 48000*3)...)
+			dat := dfpwm.OneOffEncodeDFPWM(paddedInput)
+			log.Println("dfpwm wrote:", len(dat))
+			dfpwmWr.Write(dat)
+		}
 	})
 
 	eg.Go(func() error {
-		defer stop()
+		defer log.Println("output pump is quitting")
+		defer close(output)
 
-		for {
-			select {
-			case <-egCtx.Done():
-				return egCtx.Err()
-			case frameOutput, more := <-outputChan:
-				if !more {
-					return nil
-				}
+		var frameAudio []byte
+		if opts.GroupAudioNumFrames == 0 {
+			frameAudio = make([]byte, dfpwm.SampleRate/(Framerate*8))
+		} else {
+			frameAudio = make([]byte, (dfpwm.SampleRate/(Framerate*8))*opts.GroupAudioNumFrames+((48000*3)/8))
+		}
 
-				frames := <-frameOutput
+		count := 0
 
-				frameAudio := make([]byte, dfpwm.SampleRate/(Framerate*8))
-				n, err := io.ReadFull(dfpwmRd, frameAudio)
+		for frameOutput := range outputChan {
+			frames := <-frameOutput
+
+			count++
+
+			if opts.GroupAudioNumFrames == 0 || (count%opts.GroupAudioNumFrames) == 0 {
+				_, err := io.ReadFull(dfpwmRd, frameAudio)
 				if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 					return fmt.Errorf("juroku: EncodeVideo: audio encode error: %v", err)
 				}
 
+				log.Println("read:", len(frameAudio))
+
 				output <- VideoChunk{
 					Frames: frames,
-					Audio:  frameAudio[:n],
+					Audio:  frameAudio,
+				}
+			} else {
+				output <- VideoChunk{
+					Frames: frames,
 				}
 			}
 		}
+
+		return nil
 	})
 
 	return eg.Wait()

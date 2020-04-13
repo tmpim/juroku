@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
-	"github.com/1lann/dissonance/drivers/paudio"
 	"github.com/1lann/dissonance/ffmpeg"
+	"github.com/1lann/dissonance/ffplay"
 	"github.com/tmpim/juroku/dfpwm"
 )
 
@@ -21,7 +22,7 @@ func main() {
 		panic(err)
 	}
 
-	p, _ := paudio.NewPlaybackDevice()
+	p := ffplay.NewFFPlaySink(true)
 	// p.PlayStream(result)
 
 	rd, wr := io.Pipe()
@@ -48,5 +49,5 @@ func main() {
 	// defer file.Close()
 
 	// dec := dfpwm.NewDecoder(file, 48000)
-	p.PlayStream(dec)
+	log.Println(p.PlayStream(dec))
 }

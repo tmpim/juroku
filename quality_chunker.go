@@ -4,18 +4,12 @@ import (
 	"errors"
 	"image"
 	"image/color"
-	"math"
 
 	"github.com/disintegration/gift"
 )
 
 // QualityChunker represents an image chunker that focuses on quality
 type QualityChunker struct{}
-
-func getScore(edges image.Image, x, y int) float64 {
-	r, g, b, _ := edges.At(x, y).RGBA()
-	return math.Log((float64(r)+float64(g)+float64(b))/3.0+7.0)*0.65 + 0.45
-}
 
 // ChunkImage chunks an image following the ComputerCraft requirements of
 // maximum of 2 colors per 2x3 chunk of pixels and returns it. It is assumed

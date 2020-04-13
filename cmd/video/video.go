@@ -1,73 +1,149 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"context"
 	"image"
+	"log"
 	"os"
-	"strconv"
-	"sync"
+	"time"
 
+	"github.com/gorilla/websocket"
+	"github.com/labstack/echo"
 	"github.com/tmpim/juroku"
 
 	_ "image/png"
 )
 
+const (
+	minBufferSize = 2
+)
+
+var (
+	upgrader = websocket.Upgrader{
+		HandshakeTimeout: 5 * time.Second,
+	}
+)
+
 func main() {
-	output := make([][]byte, 1800)
-	wg := new(sync.WaitGroup)
+	e := echo.New()
+	// e.Logger.SetOutput(ioutil.Discard)
+	e.GET("/ws", onWS)
+	log.Fatal(e.Start(":9999"))
+}
 
-	wg.Add(1800)
-
-	for i := 1; i <= 1800; i++ {
-		go addFrame(output, i, wg)
+func onWS(c echo.Context) error {
+	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	if err != nil {
+		return err
 	}
 
-	wg.Wait()
-
-	fmt.Println("Done! Compiling file...")
-
-	file, err := os.Create("./video.juf")
+	file, err := os.Open("./input.mkv")
 	if err != nil {
 		panic(err)
 	}
+
 	defer file.Close()
 
-	for _, out := range output {
-		_, err := file.Write(out)
+	output := make(chan juroku.VideoChunk, 10)
+
+	ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(time.Second*5))
+
+	go func() {
+		err := juroku.EncodeVideo(file, output, juroku.EncoderOptions{
+			Context: ctx,
+			Width:   665,
+			Height:  366,
+			// Width:       328,
+			// Height:      177,
+			Realtime: true,
+			Workers:  6,
+			Speed:    10,
+			Dither:   0.2,
+			Debug:    true,
+			Splitter: func(img image.Image) []image.Image {
+				sub := img.(interface {
+					SubImage(r image.Rectangle) image.Image
+				})
+				return []image.Image{
+					sub.SubImage(image.Rectangle{
+						Min: image.Point{
+							X: 0,
+							Y: 0,
+						},
+						Max: image.Point{
+							X: 328,
+							Y: 201,
+						},
+					}),
+					sub.SubImage(image.Rectangle{
+						Min: image.Point{
+							X: 336,
+							Y: 0,
+						},
+						Max: image.Point{
+							X: 664,
+							Y: 201,
+						},
+					}),
+					sub.SubImage(image.Rectangle{
+						Min: image.Point{
+							X: 0,
+							Y: 210,
+						},
+						Max: image.Point{
+							X: 328,
+							Y: 366,
+						},
+					}),
+					sub.SubImage(image.Rectangle{
+						Min: image.Point{
+							X: 336,
+							Y: 210,
+						},
+						Max: image.Point{
+							X: 664,
+							Y: 366,
+						},
+					}),
+				}
+			},
+		})
+
 		if err != nil {
 			panic(err)
 		}
-	}
-}
+	}()
 
-func addFrame(output [][]byte, i int, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	f, err := os.Open("ffmpeg_" + strconv.Itoa(i) + ".png")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	img, _, err := image.Decode(f)
-	if err != nil {
-		panic(err)
+	t := time.NewTicker(time.Second / 10)
+	defer t.Stop()
+	for range t.C {
+		if len(output) >= minBufferSize {
+			break
+		}
 	}
 
-	quant, err := juroku.Quantize(img, img, 5, 0.1)
-	if err != nil {
-		panic(err)
+	buf := new(bytes.Buffer)
+
+	log.Println("rendering!")
+	// lastTime := time.Now()
+	for range t.C {
+		frame, more := <-output
+		if !more {
+			break
+		}
+
+		// log.Println(time.Since(lastTime))
+		// lastTime = time.Now()
+
+		for _, subFrame := range frame.Frames {
+			buf.Reset()
+			subFrame.WriteTo(buf)
+			ws.WriteMessage(websocket.BinaryMessage, buf.Bytes())
+		}
 	}
 
-	chunked, err := juroku.ChunkImage(quant)
-	if err != nil {
-		panic(err)
-	}
+	log.Println("render complete!")
 
-	code, err := juroku.GenerateCode(chunked)
-	if err != nil {
-		panic(err)
-	}
-
-	output[i-1] = code
+	return nil
 }
