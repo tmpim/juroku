@@ -82,24 +82,32 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 			}
 		}
 
-		// var videoQueue [][]*juroku.FrameChunk
+		t.Stop()
+
+		var videoQueue [][]*juroku.FrameChunk
 
 		for frame := range output {
-			// if len(videoQueue) < 59 {
-			// 	videoQueue = append(videoQueue, frame.Frames)
-			// 	syncedOutput <- juroku.VideoChunk{
-			// 		Audio: frame.Audio,
-			// 	}
+			if len(videoQueue) < 60 {
+				videoQueue = append(videoQueue, frame.Frames)
+				syncedOutput <- juroku.VideoChunk{
+					Audio: frame.Audio,
+				}
 
-			// 	continue
-			// }
+				continue
+			}
 
 			syncedOutput <- juroku.VideoChunk{
-				Frames: frame.Frames,
+				Frames: videoQueue[0],
 				Audio:  frame.Audio,
 			}
 
-			// videoQueue = append(videoQueue[1:], frame.Frames)
+			videoQueue = append(videoQueue[1:], frame.Frames)
+		}
+
+		for _, videoFrame := range videoQueue {
+			syncedOutput <- juroku.VideoChunk{
+				Frames: videoFrame,
+			}
 		}
 	}()
 

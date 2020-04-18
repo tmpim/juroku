@@ -114,14 +114,13 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 		args = append(args, "-re")
 	}
 
-	args = append(args, "-f", "lavfi", "-i", "anullsrc", "-probesize", "32", "-analyzeduration", "0",
-		"-i", filename, "-acodec", "pcm_s8",
-		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate), "-af", "lowpass=f=10000",
+	wh := strconv.Itoa(opts.Width) + ":" + strconv.Itoa(opts.Height)
+	// args = append(args, "-f", "lavfi", "-i", "anullsrc", "-probesize", "32", "-analyzeduration", "0",
+	args = append(args, "-i", filename, "-acodec", "pcm_s8",
+		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate),
 		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp",
 		"-r", strconv.Itoa(Framerate), "-vf",
-		"scale="+strconv.Itoa(opts.Width)+":"+strconv.Itoa(opts.Height),
-		"-fflags", "nobuffer", "-flags", "low_delay",
-		"-strict", "experimental",
+		"scale="+wh+":force_original_aspect_ratio=decrease,pad="+wh+":(ow-iw)/2:(oh-ih)/2",
 		"pipe:4")
 
 	eg, egCtx := errgroup.WithContext(opts.Context)

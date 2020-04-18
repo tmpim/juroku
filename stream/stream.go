@@ -12,7 +12,7 @@ import (
 	"github.com/tmpim/juroku"
 )
 
-const minBufferSize = 2
+const minBufferSize = 3
 
 // Subscription is subscription.
 type Subscription uint32
