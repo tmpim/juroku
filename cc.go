@@ -129,6 +129,15 @@ function draw(t)
 	{{end}}
 end
 
+function getColors()
+	local colors = {}
+	{{range $index, $color := .Palette -}}
+	table.insert(colors, 2^{{$index}}, 0x{{colorToHex $color}})
+	{{end}}
+	
+	return colors
+end
+
 function getSize()
 	return {{.Width}}, {{.Height}}
 end
