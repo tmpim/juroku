@@ -31,14 +31,14 @@ func Quantize(ref, img image.Image, speed int, dither float64) (image.Image, col
 
 	defer res.Release()
 
-	outputImg, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(img),
-		img.Bounds().Dx(), img.Bounds().Dy(), 0)
-	if err != nil {
-		return nil, nil, fmt.Errorf("img NewImage: %s", err.Error())
-	}
-	defer outputImg.Release()
+	// outputImg, err := imagequant.NewImage(attr, imagequant.GoImageToRgba32(img),
+	// 	img.Bounds().Dx(), img.Bounds().Dy(), 0)
+	// if err != nil {
+	// 	return nil, nil, fmt.Errorf("img NewImage: %s", err.Error())
+	// }
+	// defer outputImg.Release()
 
-	res.SetOutputImage(outputImg)
+	// res.SetOutputImage(outputImg)
 
 	err = res.SetDitheringLevel(float32(dither))
 	if err != nil {
@@ -49,11 +49,14 @@ func Quantize(ref, img image.Image, speed int, dither float64) (image.Image, col
 	if err != nil {
 		return nil, nil, fmt.Errorf("WriteRemappedImage: %s", err.Error())
 	}
+	// prevent corruption by copying image
+	copiedData := make([]byte, len(rgb8data))
+	copy(copiedData, rgb8data)
 
 	palette := res.GetPalette()
 
 	result := imagequant.Rgb8PaletteToGoImage(res.GetImageWidth(),
-		res.GetImageHeight(), rgb8data, palette)
+		res.GetImageHeight(), copiedData, palette)
 	return result, palette, nil
 }
 
