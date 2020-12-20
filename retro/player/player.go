@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	framerate = 20
+	framerate = 10
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 
 func main() {
 	log.Println("starting juroku retro")
-	core, err := retro.NewCore("/usr/lib/x86_64-linux-gnu/libretro/mgba_libretro.so", &retro.Options{
+	core, err := retro.NewCore("./mgba_libretro.so", &retro.Options{
 		Username:  "1lann",
 		SystemDir: "./system",
 		SaveDir:   "./saves",

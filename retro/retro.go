@@ -156,6 +156,7 @@ func (c *RetroCore) Load(name string) error {
 	return <-waitChan
 }
 
+
 func (c *RetroCore) initCore() {
 	c.core.SetEnvironment(c.environment)
 

@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 
 	"github.com/1lann/dissonance/ffmpeg"
+	"github.com/1lann/dissonance/ffplay"
 	"github.com/tmpim/juroku/dfpwm"
 )
 
@@ -20,24 +22,24 @@ func main() {
 		panic(err)
 	}
 
-	// p := ffplay.NewFFPlaySink(true)
+	p := ffplay.NewFFPlaySink(true)
 	// p.PlayStream(result)
 
-	// rd, wr := io.Pipe()
+	rd, wr := io.Pipe()
 
-	// go func() {
-	// 	dfpwm.EncodeDFPWM(wr, stream)
-	// 	wr.Close()
-	// }()
-	// dec := dfpwm.NewDecoder(rd, 48000)
+	go func() {
+		dfpwm.EncodeDFPWM(wr, stream)
+		wr.Close()
+	}()
+	dec := dfpwm.NewDecoder(rd, 48000)
 
-	file, err := os.Create("./outfile")
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
+	// file, err := os.Create("./outfile")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer file.Close()
 
-	log.Println(dfpwm.EncodeDFPWM(file, stream))
+	// log.Println(dfpwm.EncodeDFPWM(file, stream))
 
 	// file, err := os.Open("outfile")
 	// if err != nil {
@@ -47,5 +49,5 @@ func main() {
 	// defer file.Close()
 
 	// dec := dfpwm.NewDecoder(file, 48000)
-	// log.Println(p.PlayStream(dec))
+	log.Println(p.PlayStream(dec))
 }

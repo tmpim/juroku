@@ -9,7 +9,8 @@ import (
 )
 
 // SampleRate is the expected sample rate used by DFPWM.
-const SampleRate = 48000
+// const SampleRate = 48000
+const SampleRate = 48000*2
 
 const (
 	respPrec    = 10

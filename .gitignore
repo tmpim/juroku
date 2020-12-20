@@ -3,3 +3,7 @@
 *.mp4
 *.webm
 *.flac
+*.so
+*.gba
+retro/player/saves
+retro/player/system
