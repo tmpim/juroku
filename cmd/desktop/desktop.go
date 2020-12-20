@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -9,9 +10,21 @@ import (
 )
 
 func main() {
+	if len(os.Args) <= 1 {
+		fmt.Println("specify a bash script to run")
+		return
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9999"
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		cmd := exec.Command("ffmpeg.exe", "-f", "gdigrab", "-framerate", "10", "-i", "desktop", "-filter:v",
-			"crop=2560:1440:4178:390,scale=-1:720", "-preset", "ultrafast", "-vcodec", "libx264", "-tune", "zerolatency", "-b:v", "3000k", "-f", "mpegts", "-")
+		// cmd := exec.Command("ffmpeg.exe", "-f", "gdigrab", "-framerate", "10", "-i", "desktop", "-filter:v",
+		// 	"crop=2560:1440:4178:390,scale=-1:720", "-preset", "ultrafast", "-vcodec", "libx264", "-tune", "zerolatency", "-b:v", "3000k", "-f", "mpegts", "-")
+		cmd := exec.Command("bash", os.Args[1])
+
 		rd, err := cmd.StdoutPipe()
 		if err != nil {
 			panic(err)
@@ -35,6 +48,6 @@ func main() {
 		io.Copy(w, rd)
 	})
 
-	log.Println("OK")
-	http.ListenAndServe(":9999", nil)
+	log.Println("will be listening on port:", port)
+	http.ListenAndServe(port, nil)
 }

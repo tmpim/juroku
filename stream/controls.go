@@ -73,21 +73,10 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 		defer log.Println("juroku stream: play: output syncer quitting")
 		defer close(syncedOutput)
 
-		t := time.NewTicker(time.Second / juroku.Framerate)
-		defer t.Stop()
-
-		for range t.C {
-			if len(output) >= minBufferSize {
-				break
-			}
-		}
-
-		t.Stop()
-
 		var videoQueue [][]*juroku.FrameChunk
 
 		for frame := range output {
-			if len(videoQueue) < 60 {
+			if len(videoQueue) < 72 {
 				videoQueue = append(videoQueue, frame.Frames)
 				syncedOutput <- juroku.VideoChunk{
 					Audio: frame.Audio,
@@ -133,11 +122,6 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 
 		t := time.NewTicker(time.Second / juroku.Framerate)
 		defer t.Stop()
-		for range t.C {
-			if len(syncedOutput) >= minBufferSize {
-				break
-			}
-		}
 
 		buf := new(bytes.Buffer)
 
@@ -213,9 +197,8 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 			if len(frame.Audio) > 0 {
 				// go debugWr.Write([]byte(frame.Audio))
 				log.Println("sending audio:", len(frame.Audio))
-				buf.Reset()
-				buf.WriteByte(PacketAudio)
-				s.Broadcast(SubscriptionAudio, append([]byte{PacketAudio}, []byte(frame.Audio)...))
+				s.Broadcast(SubscriptionAudio, append([]byte{PacketAudio, 0}, []byte(frame.Audio[:len(frame.Audio)/2])...))
+				s.Broadcast(SubscriptionAudio, append([]byte{PacketAudio, 1}, []byte(frame.Audio[len(frame.Audio)/2:])...))
 			}
 
 			for i, subFrame := range frame.Frames {

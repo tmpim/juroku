@@ -24,8 +24,10 @@ var (
 )
 
 var encoderOpts = juroku.EncoderOptions{
-	Width:    665,
-	Height:   366,
+	 Width:    665,
+	 Height:   366,
+	//Width: 286,
+	//Height: 156,
 	Realtime: true,
 	Workers:  6,
 	Speed:    10,
@@ -33,15 +35,16 @@ var encoderOpts = juroku.EncoderOptions{
 	Debug:    true,
 	GroupAudioNumFrames: 50,
 	Splitter: func(img image.Image) []image.Image {
-		sub := img.(interface {
-			SubImage(r image.Rectangle) image.Image
-		})
-		return []image.Image{
-			sub.SubImage(image.Rect(0, 0, 328, 201)),
-			sub.SubImage(image.Rect(336, 0, 664, 201)),
-			sub.SubImage(image.Rect(0, 210, 328, 366)),
-			sub.SubImage(image.Rect(336, 210, 664, 366)),
-		}
+		//return []image.Image{img}
+		 sub := img.(interface {
+		 	SubImage(r image.Rectangle) image.Image
+		 })
+		 return []image.Image{
+		 	sub.SubImage(image.Rect(0, 0, 328, 201)),
+		 	sub.SubImage(image.Rect(336, 0, 664, 201)),
+		 	sub.SubImage(image.Rect(0, 210, 328, 366)),
+		 	sub.SubImage(image.Rect(336, 210, 664, 366)),
+		 }
 	},
 }
 

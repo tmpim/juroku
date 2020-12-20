@@ -22,7 +22,7 @@ import (
 	_ "image/png"
 )
 
-const Framerate = 10
+const Framerate = 20
 
 // VideoChunk is composed of a Frame and Audio chunk.
 type VideoChunk struct {
@@ -200,24 +200,31 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 			return err
 		}
 
-		input := make([]int8, (dfpwm.SampleRate/Framerate)*opts.GroupAudioNumFrames)
+		dataLength := (dfpwm.SampleRate/Framerate)*opts.GroupAudioNumFrames
+		bufferLength := dfpwm.SampleRate*3
+		totalLength := dataLength + bufferLength
+		zeros := make([]int8, totalLength)
+		input := make([]int8, totalLength)
 
 		for {
 			count := 0
-			for count < len(input) {
-				n, err := stream.Read(input[count:])
+			for count < dataLength {
+				n, err := stream.Read(input[count:count+dataLength])
+				count += n
 				if err == io.EOF {
+					copy(input[count:], zeros)
+					dat := dfpwm.OneOffEncodeDFPWM(input)
+					dfpwmWr.Write(dat)
+					log.Println("dfpwm final write:", len(dat))
 					dfpwmWr.Close()
 					return nil
 				} else if err != nil {
 					dfpwmWr.CloseWithError(err)
 					return err
 				}
-				count += n
 			}
 
-			paddedInput := append(input, make([]int8, 48000*3)...)
-			dat := dfpwm.OneOffEncodeDFPWM(paddedInput)
+			dat := dfpwm.OneOffEncodeDFPWM(input)
 			log.Println("dfpwm wrote:", len(dat))
 			dfpwmWr.Write(dat)
 		}
@@ -231,7 +238,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 		if opts.GroupAudioNumFrames == 0 {
 			frameAudio = make([]byte, dfpwm.SampleRate/(Framerate*8))
 		} else {
-			frameAudio = make([]byte, (dfpwm.SampleRate/(Framerate*8))*opts.GroupAudioNumFrames+((48000*3)/8))
+			frameAudio = make([]byte, (dfpwm.SampleRate/(Framerate*8))*opts.GroupAudioNumFrames+((dfpwm.SampleRate*3)/8))
 		}
 
 		count := 0
@@ -259,6 +266,23 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 				}
 			}
 		}
+
+		remainder, _ := ioutil.ReadAll(dfpwmRd)
+
+		if len(remainder) > 0 {
+			if opts.GroupAudioNumFrames != 0 {
+				for ; count%opts.GroupAudioNumFrames != 0; count++ {
+					log.Println("delaying")
+					output <- VideoChunk{}
+				}
+			}
+
+			output <- VideoChunk{
+				Audio:  remainder,
+			}
+		}
+
+		log.Println("final read:", len(remainder))
 
 		return nil
 	})

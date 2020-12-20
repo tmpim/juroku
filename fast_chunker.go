@@ -61,6 +61,9 @@ func (c *FastChunker) ChunkImage(img image.Image, palette color.Palette) (*Frame
 	startX := img.Bounds().Min.X
 	endX := img.Bounds().Max.X
 
+	endY -= (endY - startY) % 3
+	endX -= (endX - startX) % 2
+
 	result.Width = (endX - startX) / 2
 	result.Height = (endY - startY) / 3
 
@@ -82,7 +85,7 @@ func (c *FastChunker) ChunkImage(img image.Image, palette color.Palette) (*Frame
 			// result.Rows[row].Text[col] = 128
 
 			var chunk byte = 128
-			colorScore := make([]float64, 6)
+			colorScore := make([]int, 6)
 
 			subpixel := 0
 			for y := chunkY; y < chunkY+3; y++ {
@@ -93,7 +96,7 @@ func (c *FastChunker) ChunkImage(img image.Image, palette color.Palette) (*Frame
 
 					for i := 0; i < subpixel+1; i++ {
 						if pixelChunk[i] == pixelChunk[subpixel] {
-							colorScore[i] += getScore(edges, x, y)
+							colorScore[i]++
 							break
 						}
 					}
@@ -120,21 +123,37 @@ func (c *FastChunker) ChunkImage(img image.Image, palette color.Palette) (*Frame
 				}
 			}
 
-			var top1 float64
+			var maxDistance float64 = -100
 			var top1Color int
-			var top2 float64
 			var top2Color int
 
 			for col, score := range colorScore {
-				if score > top1 {
-					top2 = top1
-					top2Color = top1Color
-					top1Color = pixelChunk[col]
-					top1 = score
-				} else if score > top2 {
-					top2Color = pixelChunk[col]
-					top2 = score
+				if score == 0 {
+					continue
 				}
+
+				for innerCol, innerScore := range colorScore {
+					if innerScore == 0 {
+						continue
+					}
+
+					dist := distanceTable[pixelChunk[col]][pixelChunk[innerCol]]
+					if dist > maxDistance {
+						maxDistance = dist
+						top1Color = pixelChunk[col]
+						top2Color = pixelChunk[innerCol]
+					}
+				}
+
+				// if score > top1 {
+				// 	top2 = top1
+				// 	top2Color = top1Color
+				// 	top1Color = pixelChunk[col]
+				// 	top1 = score
+				// } else if score > top2 {
+				// 	top2Color = pixelChunk[col]
+				// 	top2 = score
+				// }
 			}
 
 			// var top1Color int
