@@ -76,7 +76,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 		var videoQueue [][]*juroku.FrameChunk
 
 		for frame := range output {
-			if len(videoQueue) < 72 {
+			if len(videoQueue) < 62 {
 				videoQueue = append(videoQueue, frame.Frames)
 				syncedOutput <- juroku.VideoChunk{
 					Audio: frame.Audio,

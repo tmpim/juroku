@@ -24,8 +24,8 @@ var (
 )
 
 var encoderOpts = juroku.EncoderOptions{
-	 Width:    665,
-	 Height:   366,
+	Width:    665,
+	Height:   366,
 	//Width: 286,
 	//Height: 156,
 	Realtime: true,
@@ -35,7 +35,7 @@ var encoderOpts = juroku.EncoderOptions{
 	Debug:    true,
 	GroupAudioNumFrames: 50,
 	Splitter: func(img image.Image) []image.Image {
-		//return []image.Image{img}
+		 //return []image.Image{img}
 		 sub := img.(interface {
 		 	SubImage(r image.Rectangle) image.Image
 		 })

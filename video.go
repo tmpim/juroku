@@ -22,7 +22,7 @@ import (
 	_ "image/png"
 )
 
-const Framerate = 20
+const Framerate = 10
 
 // VideoChunk is composed of a Frame and Audio chunk.
 type VideoChunk struct {
@@ -116,7 +116,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 
 	wh := strconv.Itoa(opts.Width) + ":" + strconv.Itoa(opts.Height)
 	// args = append(args, "-f", "lavfi", "-i", "anullsrc", "-probesize", "32", "-analyzeduration", "0",
-	args = append(args, "-i", filename, "-acodec", "pcm_s8",
+	args = append(args, "-analyzeduration", "30000000", "-probesize", "50000000", "-i", filename, "-acodec", "pcm_s8",
 		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate),
 		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp",
 		"-r", strconv.Itoa(Framerate), "-vf",
@@ -209,7 +209,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 		for {
 			count := 0
 			for count < dataLength {
-				n, err := stream.Read(input[count:count+dataLength])
+				n, err := stream.Read(input[count:dataLength])
 				count += n
 				if err == io.EOF {
 					copy(input[count:], zeros)
