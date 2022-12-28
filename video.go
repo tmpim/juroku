@@ -15,14 +15,11 @@ import (
 	"sync"
 
 	"github.com/1lann/dissonance/audio"
-	"github.com/tmpim/juroku/dfpwm"
 	"golang.org/x/image/bmp"
 	"golang.org/x/sync/errgroup"
 
 	_ "image/png"
 )
-
-const Framerate = 10
 
 // VideoChunk is composed of a Frame and Audio chunk.
 type VideoChunk struct {
@@ -46,6 +43,12 @@ func (a AudioChunk) WriteTo(w io.Writer) error {
 	return err
 }
 
+type AudioEncoder interface {
+	SampleRateBytes() int
+	SampleRate() int
+	Encode(stream audio.Stream, wr io.WriteCloser, opts EncoderOptions) error
+}
+
 type EncoderOptions struct {
 	Context             context.Context
 	Width               int
@@ -57,6 +60,8 @@ type EncoderOptions struct {
 	Realtime            bool
 	GroupAudioNumFrames int
 	Splitter            FrameSplitter
+	Framerate           int
+	AudioEncoder        AudioEncoder
 }
 
 func (e *EncoderOptions) validate() error {
@@ -117,9 +122,9 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 	wh := strconv.Itoa(opts.Width) + ":" + strconv.Itoa(opts.Height)
 	// args = append(args, "-f", "lavfi", "-i", "anullsrc", "-probesize", "32", "-analyzeduration", "0",
 	args = append(args, "-analyzeduration", "30000000", "-probesize", "50000000", "-i", filename, "-acodec", "pcm_s8",
-		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(dfpwm.SampleRate),
+		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(opts.AudioEncoder.SampleRate()),
 		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp",
-		"-r", strconv.Itoa(Framerate), "-vf",
+		"-r", strconv.Itoa(opts.Framerate), "-vf",
 		"scale="+wh+":force_original_aspect_ratio=decrease,pad="+wh+":(ow-iw)/2:(oh-ih)/2",
 		"pipe:4")
 
@@ -169,7 +174,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 	})
 
 	// Prepare audio buffer.
-	stream := audio.NewOfflineStream(dfpwm.SampleRate, dfpwm.SampleRate/4)
+	stream := audio.NewOfflineStream(opts.AudioEncoder.SampleRate(), opts.AudioEncoder.SampleRate()/4)
 
 	eg.Go(func() error {
 		defer log.Println("audio stream is quitting")
@@ -184,50 +189,12 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 		return nil
 	})
 
-	dfpwmRd, dfpwmWr := io.Pipe()
+	audioEnc := opts.AudioEncoder
+
+	audioEncRd, audioEncWr := io.Pipe()
+
 	eg.Go(func() error {
-		defer log.Println("EncodeDFPWM is quitting")
-
-		if opts.GroupAudioNumFrames == 0 {
-			log.Println("standard encode")
-			err := dfpwm.EncodeDFPWM(dfpwmWr, stream)
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				dfpwmWr.Close()
-				return nil
-			}
-
-			dfpwmWr.CloseWithError(err)
-			return err
-		}
-
-		dataLength := (dfpwm.SampleRate/Framerate)*opts.GroupAudioNumFrames
-		bufferLength := dfpwm.SampleRate*3
-		totalLength := dataLength + bufferLength
-		zeros := make([]int8, totalLength)
-		input := make([]int8, totalLength)
-
-		for {
-			count := 0
-			for count < dataLength {
-				n, err := stream.Read(input[count:dataLength])
-				count += n
-				if err == io.EOF {
-					copy(input[count:], zeros)
-					dat := dfpwm.OneOffEncodeDFPWM(input)
-					dfpwmWr.Write(dat)
-					log.Println("dfpwm final write:", len(dat))
-					dfpwmWr.Close()
-					return nil
-				} else if err != nil {
-					dfpwmWr.CloseWithError(err)
-					return err
-				}
-			}
-
-			dat := dfpwm.OneOffEncodeDFPWM(input)
-			log.Println("dfpwm wrote:", len(dat))
-			dfpwmWr.Write(dat)
-		}
+		return audioEnc.Encode(stream, audioEncWr, opts)
 	})
 
 	eg.Go(func() error {
@@ -236,9 +203,9 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 
 		var frameAudio []byte
 		if opts.GroupAudioNumFrames == 0 {
-			frameAudio = make([]byte, dfpwm.SampleRate/(Framerate*8))
+			frameAudio = make([]byte, audioEnc.SampleRateBytes()/opts.Framerate)
 		} else {
-			frameAudio = make([]byte, (dfpwm.SampleRate/(Framerate*8))*opts.GroupAudioNumFrames+((dfpwm.SampleRate*3)/8))
+			frameAudio = make([]byte, (audioEnc.SampleRateBytes()/opts.Framerate)*opts.GroupAudioNumFrames)
 		}
 
 		count := 0
@@ -249,16 +216,17 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 			count++
 
 			if opts.GroupAudioNumFrames == 0 || (count%opts.GroupAudioNumFrames) == 0 {
-				_, err := io.ReadFull(dfpwmRd, frameAudio)
+				_, err := io.ReadFull(audioEncRd, frameAudio)
 				if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 					return fmt.Errorf("juroku: EncodeVideo: audio encode error: %v", err)
 				}
 
-				log.Println("read:", len(frameAudio))
+				frameAudioCopy := make([]byte, len(frameAudio))
+				copy(frameAudioCopy, frameAudio)
 
 				output <- VideoChunk{
 					Frames: frames,
-					Audio:  frameAudio,
+					Audio:  frameAudioCopy,
 				}
 			} else {
 				output <- VideoChunk{
@@ -267,7 +235,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 			}
 		}
 
-		remainder, _ := ioutil.ReadAll(dfpwmRd)
+		remainder, _ := ioutil.ReadAll(audioEncRd)
 
 		if len(remainder) > 0 {
 			if opts.GroupAudioNumFrames != 0 {
@@ -278,7 +246,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 			}
 
 			output <- VideoChunk{
-				Audio:  remainder,
+				Audio: remainder,
 			}
 		}
 

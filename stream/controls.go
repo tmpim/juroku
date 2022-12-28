@@ -57,7 +57,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 	opts.Context = ctx
 	opts.Realtime = true
 
-	output := make(chan juroku.VideoChunk, juroku.Framerate)
+	output := make(chan juroku.VideoChunk, opts.Framerate)
 	go func() {
 		defer input.Close()
 		log.Println("juroku stream: play: encode video started")
@@ -67,7 +67,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 		}
 	}()
 
-	syncedOutput := make(chan juroku.VideoChunk, juroku.Framerate)
+	syncedOutput := make(chan juroku.VideoChunk, opts.Framerate)
 
 	go func() {
 		defer log.Println("juroku stream: play: output syncer quitting")
@@ -76,7 +76,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 		var videoQueue [][]*juroku.FrameChunk
 
 		for frame := range output {
-			if len(videoQueue) < 62 {
+			if len(videoQueue) < 8 {
 				videoQueue = append(videoQueue, frame.Frames)
 				syncedOutput <- juroku.VideoChunk{
 					Audio: frame.Audio,
@@ -120,7 +120,9 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 			}
 		}()
 
-		t := time.NewTicker(time.Second / juroku.Framerate)
+		frameTime := time.Second / time.Duration(opts.Framerate)
+
+		t := time.NewTicker(frameTime)
 		defer t.Stop()
 
 		buf := new(bytes.Buffer)
@@ -138,7 +140,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 			targetState := atomic.LoadUint32(&s.targetState)
 			if !hasPaused && targetState == StatePaused {
 				state := NewEmptyState()
-				state.Timestamp = time.Duration(frameCount) * (time.Second / juroku.Framerate)
+				state.Timestamp = time.Duration(frameCount) * frameTime
 				state.State = StatePaused
 				state.RelativeStart = time.Now()
 				if !s.UpdateState(state, []int{StatePlaying, StatePaused}) {
@@ -148,7 +150,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 				continue
 			} else if hasPaused && targetState == StatePlaying && frameCount > 0 {
 				state := NewEmptyState()
-				duration := time.Duration(frameCount) * (time.Second / juroku.Framerate)
+				duration := time.Duration(frameCount) * frameTime
 				state.State = StatePlaying
 				state.RelativeStart = time.Now().Add(-duration)
 				if !s.UpdateState(state, []int{StatePlaying, StatePaused}) {
@@ -184,7 +186,7 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 				statePlaying <- nil
 			} else {
 				currentState := s.State()
-				expectedElapsed := time.Duration(frameCount) * (time.Second / juroku.Framerate)
+				expectedElapsed := time.Duration(frameCount) * frameTime
 				diffElapsed := math.Abs(time.Since(currentState.RelativeStart).Seconds() - expectedElapsed.Seconds())
 				if diffElapsed > 1 {
 					state := NewEmptyState()

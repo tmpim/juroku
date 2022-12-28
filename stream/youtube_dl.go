@@ -146,7 +146,7 @@ func YoutubeDLSource(videoURL string, ctx context.Context) (*Metadata, io.ReadCl
 
 	wrappedCtx, cancel := context.WithCancel(ctx)
 
-	cmd := exec.CommandContext(wrappedCtx, "youtube-dl", args...)
+	cmd := exec.CommandContext(wrappedCtx, "yt-dlp", args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
