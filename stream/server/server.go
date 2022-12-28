@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,8 +26,8 @@ var (
 )
 
 var encoderOpts = juroku.EncoderOptions{
-	Width:  328,
-	Height: 201,
+	Width:  0,
+	Height: 0,
 	//Width: 286,
 	//Height: 156,
 	Realtime:            true,
@@ -51,6 +53,21 @@ var encoderOpts = juroku.EncoderOptions{
 }
 
 func main() {
+	width, err := strconv.Atoi(os.Getenv("JUROKU_WIDTH"))
+	if err == nil {
+		panic("JUROKU_WIDTH must be an integer")
+	}
+
+	height, err := strconv.Atoi(os.Getenv("JUROKU_HEIGHT"))
+	if err == nil {
+		panic("JUROKU_HEIGHT must be an integer")
+	}
+
+	encoderOpts.Width = width
+	encoderOpts.Height = height
+
+	encoderOpts.Debug = os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
+
 	mgr := stream.NewStreamManager(encoderOpts)
 
 	e := echo.New()
@@ -154,5 +171,5 @@ func main() {
 		return c.JSON(http.StatusOK, &state)
 	})
 
-	log.Fatal(e.Start(":9999"))
+	log.Fatal(e.Start(":4600"))
 }
