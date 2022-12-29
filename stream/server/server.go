@@ -74,6 +74,10 @@ func main() {
 
 	e.Use(middleware.Logger())
 
+	e.GET("/healthz", func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+
 	api := e.Group("/api")
 
 	api.GET("/client", func(c echo.Context) error {
