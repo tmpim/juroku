@@ -31,7 +31,6 @@ var encoderOpts = juroku.EncoderOptions{
 	//Width: 286,
 	//Height: 156,
 	Realtime:            true,
-	Workers:             6,
 	Speed:               10,
 	Dither:              0.3,
 	Debug:               false,
@@ -63,8 +62,14 @@ func main() {
 		panic("JUROKU_HEIGHT must be an integer")
 	}
 
+	workerCount, err := strconv.Atoi(os.Getenv("JUROKU_WORKER_COUNT"))
+	if err != nil {
+		panic("JUROKU_WORKER_COUNT must be an integer")
+	}
+
 	encoderOpts.Width = width
 	encoderOpts.Height = height
+	encoderOpts.Workers = workerCount
 
 	encoderOpts.Debug = os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
 
