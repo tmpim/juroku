@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo-contrib/pprof"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/tmpim/juroku"
 	"github.com/tmpim/juroku/stream"
 
@@ -73,11 +74,15 @@ func main() {
 
 	encoderOpts.Debug = os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
 
+	log.Printf("encoder options: %+v", encoderOpts)
+
 	mgr := stream.NewStreamManager(encoderOpts)
 
 	e := echo.New()
 
 	e.Use(middleware.Logger())
+
+	pprof.Register(e)
 
 	e.GET("/healthz", func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")

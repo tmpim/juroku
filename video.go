@@ -221,6 +221,10 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 					return fmt.Errorf("juroku: EncodeVideo: audio encode error: %v", err)
 				}
 
+				if count == 1 {
+					log.Println("received first audio frame")
+				}
+
 				frameAudioCopy := make([]byte, len(frameAudio))
 				copy(frameAudioCopy, frameAudio)
 
@@ -263,12 +267,19 @@ func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
 	defer close(inbox)
 	defer close(outputChan)
 
+	firstFrame := true
+
 	for {
 		img, err := bmp.Decode(frameRd)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil
 		} else if err != nil {
 			return err
+		}
+
+		if firstFrame {
+			firstFrame = false
+			log.Println("received first frame")
 		}
 
 		frameOutput := make(chan []*FrameChunk, 1)
