@@ -1,5 +1,5 @@
 
-local JUROKU_HOST = ""
+local JUROKU_HOST = "wss://juroku.1l.hn/api/client"
 
 if not debug then
     error("Missing debug API")
@@ -25,7 +25,7 @@ end
 
 -- local tapeA = wrapRemote("tape_drive_55", "back")
 
-speaker = peripheral.wrap("top")
+speaker = peripheral.wrap("bottom")
 
 local function playAudio(data)
     if #data == 0 then

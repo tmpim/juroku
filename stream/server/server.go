@@ -54,12 +54,12 @@ var encoderOpts = juroku.EncoderOptions{
 
 func main() {
 	width, err := strconv.Atoi(os.Getenv("JUROKU_WIDTH"))
-	if err == nil {
+	if err != nil {
 		panic("JUROKU_WIDTH must be an integer")
 	}
 
 	height, err := strconv.Atoi(os.Getenv("JUROKU_HEIGHT"))
-	if err == nil {
+	if err != nil {
 		panic("JUROKU_HEIGHT must be an integer")
 	}
 
