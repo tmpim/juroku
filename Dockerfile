@@ -30,7 +30,7 @@ RUN go mod download
 COPY . /workdir
 
 RUN git config --global --add safe.directory /workdir
-RUN CGO_CFLAGS_ALLOW=".*" CGO_LDFLAGS_ALLOW=".*" go build -ldflags '-extldflags "-fno-PIC -static -lm"' -buildmode pie -tags 'osusergo netgo static_build' -o juroku ./stream/server
+RUN CGO_CFLAGS_ALLOW=".*" CGO_LDFLAGS_ALLOW=".*" go build -ldflags '-extldflags "-fno-PIC -static -Wl,--no-as-needed -lm"' -buildmode pie -tags 'osusergo netgo static_build' -o juroku ./stream/server
 
 FROM alpine:3
 
