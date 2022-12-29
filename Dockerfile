@@ -35,7 +35,7 @@ RUN CGO_CFLAGS_ALLOW=".*" CGO_LDFLAGS_ALLOW=".*" go build -ldflags '-extldflags 
 FROM alpine:3
 
 RUN apk add ca-certificates ffmpeg python3 curl
-RUN curl --show-error --fail https://github.com/yt-dlp/yt-dlp/releases/download/2022.11.11/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp
+RUN curl --show-error --fail -L https://github.com/yt-dlp/yt-dlp/releases/download/2022.11.11/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp
 
 WORKDIR /
 
