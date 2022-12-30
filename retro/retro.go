@@ -156,7 +156,6 @@ func (c *RetroCore) Load(name string) error {
 	return <-waitChan
 }
 
-
 func (c *RetroCore) initCore() {
 	c.core.SetEnvironment(c.environment)
 
@@ -277,6 +276,8 @@ func (c *RetroCore) environment(cmd uint32, data unsafe.Pointer) bool {
 		c.env.avInfo.Geometry = libretro.GetGeometry(data)
 	case libretro.EnvironmentSetSystemAVInfo:
 		c.env.avInfo = libretro.GetSystemAVInfo(data)
+	case libretro.EnvironmentGetCoreOptionsVersion:
+		libretro.SetUint(data, 0)
 	default:
 		log.Println("juroku retro: host environment command not implemented:", cmd)
 		return false

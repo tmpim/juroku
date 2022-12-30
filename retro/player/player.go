@@ -2,26 +2,35 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"image"
+	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/1lann/dissonance/audio"
+	"github.com/1lann/dissonance/filters/samplerate"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/tmpim/juroku"
 	"github.com/tmpim/juroku/retro"
+	"golang.org/x/sync/errgroup"
 
 	_ "image/png"
 )
 
 const (
-	framerate = 10
+	framerate = 20
 )
 
 var (
@@ -38,10 +47,41 @@ var (
 
 func main() {
 	log.Println("starting juroku retro")
-	core, err := retro.NewCore("./mgba_libretro.so", &retro.Options{
-		Username:  "1lann",
-		SystemDir: "./system",
-		SaveDir:   "./saves",
+
+	var libretroPath string
+
+	err := filepath.WalkDir("/usr/lib", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if libretroPath != "" {
+			return filepath.SkipDir
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if filepath.Base(path) == "mgba_libretro.so" {
+			libretroPath = path
+			return filepath.SkipDir
+		}
+
+		return nil
+	})
+
+	if libretroPath == "" {
+		if err != nil {
+			panic(fmt.Sprintf("finding mgba_libretro.so: %+v\n", err))
+		}
+		panic("could not find mgba_libretro.so")
+	}
+
+	core, err := retro.NewCore(libretroPath, &retro.Options{
+		Username:  os.Getenv("JUROKU_USERNAME"),
+		SystemDir: os.Getenv("JUROKU_SYSTEM_DIR"),
+		SaveDir:   os.Getenv("JUROKU_SAVE_DIR"),
 	})
 	if err != nil {
 		panic(err)
@@ -179,8 +219,15 @@ func main() {
 	frameSeqer <- struct{}{}
 	audioSeqer := make(chan struct{}, 1)
 	audioSeqer <- struct{}{}
+	ccAudioSeqer := make(chan struct{}, 1)
+	ccAudioSeqer <- struct{}{}
 	lastFrame := time.Now()
 	minDelay := (time.Second / time.Duration(framerate)) - (5 * time.Millisecond)
+	// useDebug := os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
+	audioGroupFrames, err := strconv.Atoi(os.Getenv("JUROKU_AUDIO_FRAMES"))
+	if err != nil {
+		panic("JUROKU_AUDIO_FRAMES must be an integer")
+	}
 
 	core.OnFrameDraw(func(img image.Image) {
 		if time.Since(lastFrame) < minDelay {
@@ -213,13 +260,15 @@ func main() {
 				frameSeqer <- struct{}{}
 			}()
 			for _, conn := range connState {
-				err := conn.WriteMessage(websocket.BinaryMessage, buf.Bytes())
+				err := conn.WriteMessage(websocket.BinaryMessage, append([]byte{1}, buf.Bytes()...))
 				if err != nil {
 					conn.Close()
 				}
 			}
 		}()
 	})
+
+	var inputStream *audio.OfflineStream
 
 	core.OnAudioBuffer(1024, func(data []int16) {
 		go func() {
@@ -238,20 +287,98 @@ func main() {
 			defer func() {
 				audioSeqer <- struct{}{}
 			}()
+
 			for _, conn := range connState {
 				err := conn.WriteMessage(websocket.BinaryMessage, byteData)
 				if err != nil {
 					conn.Close()
 				}
 			}
+
+			if err := inputStream.WriteValues(data); err != nil {
+				log.Printf("failed to write to input audio stream: %v", err)
+			}
 		}()
 	})
 
 	core.LoadGame(os.Args[1])
 
-	go core.Run()
+	rootCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	eg, ctx := errgroup.WithContext(rootCtx)
+
+	eg.Go(func() error {
+		core.Run()
+		return errors.New("core exited")
+	})
+
+	sysSampleRate := core.AVInfo().Timing.SampleRate
+	inputStream = audio.NewOfflineStream(int(sysSampleRate), 512)
+
+	encoder := new(juroku.PCMEncoder)
+	audioEncRd, audioEncWr := io.Pipe()
+
+	eg.Go(func() error {
+		sampleRateFilter := samplerate.NewFilter(encoder.SampleRate()).Filter(inputStream)
+		return encoder.Encode(sampleRateFilter, audioEncWr, juroku.EncoderOptions{})
+	})
+
+	eg.Go(func() error {
+		frameAudio := make([]byte, (encoder.SampleRateBytes()/framerate)*audioGroupFrames)
+		for {
+			_, err := io.ReadFull(audioEncRd, frameAudio)
+			if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+				return fmt.Errorf("juroku: EncodeVideo: audio encode error: %v", err)
+			}
+
+			videoConnMutex.Lock()
+			connState := make([]*websocket.Conn, len(videoConns))
+			copy(connState, videoConns)
+			videoConnMutex.Unlock()
+
+			<-ccAudioSeqer
+			defer func() {
+				ccAudioSeqer <- struct{}{}
+			}()
+
+			for _, conn := range connState {
+				err := conn.WriteMessage(websocket.BinaryMessage, append([]byte{2}, frameAudio...))
+				if err != nil {
+					conn.Close()
+				}
+			}
+		}
+	})
+
+	var bootComplete atomic.Bool
+
+	e.GET("/healthz", func(c echo.Context) error {
+		if ctx.Err() != nil {
+			log.Println("healthz: context error (shutting donw?):", ctx.Err())
+			return c.NoContent(http.StatusServiceUnavailable)
+		}
+		if !bootComplete.Load() {
+			log.Println("healthz: boot not complete")
+			return c.NoContent(http.StatusServiceUnavailable)
+		}
+
+		return c.NoContent(http.StatusOK)
+	})
+
+	eg.Go(func() error {
+		return e.Start(":4600")
+	})
+
+	go func() {
+		<-ctx.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		e.Shutdown(ctx)
+	}()
 
 	log.Println("sample rate:", core.AVInfo().Timing.SampleRate)
+	bootComplete.Store(true)
 
-	log.Fatal(e.Start(":9999"))
+	log.Println(eg.Wait())
 }

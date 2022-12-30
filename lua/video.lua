@@ -50,9 +50,10 @@ local function run()
   clearMonitors()
   print("Connecting")
 
-  local ok, endpoint = http.websocketAsync(JUROKU_HOST)
+  local ok = http.websocketAsync(JUROKU_HOST)
   if not ok then error("couldnt connect") end
   local ws
+  local panicTimer = os.startTimer(6)
   local decoder = Decoder.new(monitors)
 
   for k, v in pairs(decoder) do
@@ -64,26 +65,52 @@ local function run()
   parallel.waitForAll(function()
     while true do
       local e = {os.pullEvent()}
-      local event = e[1]
-
-      if event == "websocket_success" then
-        ws = e[3]
-        print("Connected!")
-        ws.send("{\"id\": \"test\", \"subscription\": 1}")
-      elseif event == "websocket_failure" then
-        error("Connection failed")
-      elseif event == "websocket_message" then
-        --print("rendering! " .. os.epoch("utc") .. " " .. type(e[3]))
-        if e[3]:byte(1) == 1 then
-          if count == 0 then
-            print("first packet at " .. os.epoch("utc"))
+      local event, url = e[1], e[2]
+      if url == JUROKU_HOST then
+        if event == "websocket_success" then
+          if panicTimer then
+            os.cancelTimer(panicTimer)
+            panicTimer = nil
           end
-          if count == 15 then
-            print("15th frame at " .. os.epoch("utc"))
+          ws = e[3]
+          print("Connected!")
+          ws.send("{\"id\": \"test\", \"subscription\": 1}")
+        elseif event == "websocket_closed" or event == "websocket_failure" then
+          if panicTimer then
+            os.cancelTimer(panicTimer)
+            panicTimer = nil
           end
-          count = count+1
-          decoder:renderNextMonitor(e[3]:byte(2), e[3]:sub(3, #e[3]))
+          print("Connection lost, retrying...")
+          if e[3] ~= nil then
+            print(e[3])
+          end
+          if event == "websocket_failure" then
+            ws.close()
+            print("Waiting 3 seconds before retrying...")
+            sleep(3)
+          end
+          local ok = http.websocketAsync(JUROKU_HOST)
+          if not ok then error("couldnt connect") end
+          panicTimer = os.startTimer(6)
+        elseif event == "websocket_message" then
+          --print("rendering! " .. os.epoch("utc") .. " " .. type(e[3]))
+          if e[3]:byte(1) == 1 then
+            if count == 0 then
+              print("first packet at " .. os.epoch("utc"))
+            end
+            if count == 15 then
+              print("15th frame at " .. os.epoch("utc"))
+            end
+            count = count+1
+            decoder:renderNextMonitor(e[3]:byte(2), e[3]:sub(3, #e[3]))
+          end
         end
+      end
+      if event == "timer" and url == panicTimer then
+        panicTimer = nil
+        print("uhhh conneciton timeout!! bailing out")
+        sleep(1)
+        os.reboot()
       end
     end
   end)

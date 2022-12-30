@@ -1,8 +1,8 @@
 local Decoder = {}
 
 function Decoder.new(monitors)
-        local self = {monitors = monitors}
-        setmetatable(self, {__index = Decoder})
+  local self = {monitors = monitors}
+  setmetatable(self, {__index = Decoder})
   return self
 end
 

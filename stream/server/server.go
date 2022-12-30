@@ -73,7 +73,7 @@ func main() {
 	encoderOpts.Debug = os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
 	encoderOpts.Verbose = os.Getenv("JUROKU_VERBOSE") != "" && os.Getenv("JUROKU_VERBOSE") != "0"
 	encoderOpts.Realtime = os.Getenv("JUROKU_REALTIME") != "" && os.Getenv("JUROKU_REALTIME") != "0"
-	encoderOpts.AudioEncoder = &juroku.PCMEncoder{Verbose: encoderOpts.Verbose}
+	encoderOpts.AudioEncoder = &juroku.PCMEncoder{}
 
 	log.Printf("encoder options: %+v", encoderOpts)
 
