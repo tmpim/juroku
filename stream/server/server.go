@@ -31,7 +31,6 @@ var encoderOpts = juroku.EncoderOptions{
 	Height: 0,
 	//Width: 286,
 	//Height: 156,
-	Realtime:            true,
 	Speed:               10,
 	Dither:              0.3,
 	Debug:               false,
@@ -73,6 +72,7 @@ func main() {
 
 	encoderOpts.Debug = os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
 	encoderOpts.Verbose = os.Getenv("JUROKU_VERBOSE") != "" && os.Getenv("JUROKU_VERBOSE") != "0"
+	encoderOpts.Realtime = os.Getenv("JUROKU_REALTIME") != "" && os.Getenv("JUROKU_REALTIME") != "0"
 	encoderOpts.AudioEncoder = &juroku.PCMEncoder{Verbose: encoderOpts.Verbose}
 
 	log.Printf("encoder options: %+v", encoderOpts)
