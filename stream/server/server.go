@@ -49,7 +49,6 @@ var encoderOpts = juroku.EncoderOptions{
 		// 	sub.SubImage(image.Rect(336, 210, 664, 366)),
 		// }
 	},
-	AudioEncoder: new(juroku.PCMEncoder),
 }
 
 func main() {
@@ -73,6 +72,8 @@ func main() {
 	encoderOpts.Workers = workerCount
 
 	encoderOpts.Debug = os.Getenv("JUROKU_DEBUG") != "" && os.Getenv("JUROKU_DEBUG") != "0"
+	encoderOpts.Verbose = os.Getenv("JUROKU_VERBOSE") != "" && os.Getenv("JUROKU_VERBOSE") != "0"
+	encoderOpts.AudioEncoder = &juroku.PCMEncoder{Verbose: encoderOpts.Verbose}
 
 	log.Printf("encoder options: %+v", encoderOpts)
 

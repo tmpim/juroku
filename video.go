@@ -57,6 +57,7 @@ type EncoderOptions struct {
 	Speed               int
 	Dither              float64
 	Debug               bool
+	Verbose             bool
 	Realtime            bool
 	GroupAudioNumFrames int
 	Splitter            FrameSplitter
@@ -170,7 +171,7 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 
 	eg.Go(func() error {
 		defer log.Println("decodeToWorkerPump is quitting")
-		return decodeToWorkerPump(frameRd, inbox, outputChan)
+		return decodeToWorkerPump(frameRd, inbox, outputChan, opts.Verbose)
 	})
 
 	// Prepare audio buffer.
@@ -221,10 +222,6 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 					return fmt.Errorf("juroku: EncodeVideo: audio encode error: %v", err)
 				}
 
-				if count == 1 {
-					log.Println("received first audio frame")
-				}
-
 				frameAudioCopy := make([]byte, len(frameAudio))
 				copy(frameAudioCopy, frameAudio)
 
@@ -263,11 +260,12 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 }
 
 func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
-	outputChan chan chan []*FrameChunk) error {
+	outputChan chan chan []*FrameChunk, verbose bool) error {
 	defer close(inbox)
 	defer close(outputChan)
 
 	firstFrame := true
+	i := 0
 
 	for {
 		img, err := bmp.Decode(frameRd)
@@ -279,7 +277,6 @@ func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
 
 		if firstFrame {
 			firstFrame = false
-			log.Println("received first frame")
 		}
 
 		frameOutput := make(chan []*FrameChunk, 1)
@@ -288,6 +285,11 @@ func decodeToWorkerPump(frameRd io.Reader, inbox chan frameJob,
 		inbox <- frameJob{
 			img:    img,
 			output: frameOutput,
+		}
+
+		if verbose {
+			i++
+			log.Printf("sent video frame %d", i)
 		}
 	}
 }

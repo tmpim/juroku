@@ -9,6 +9,7 @@ import (
 )
 
 type PCMEncoder struct {
+	Verbose bool
 }
 
 func (e *PCMEncoder) SampleRateBytes() int {
@@ -25,6 +26,9 @@ func (e *PCMEncoder) Encode(stream audio.Stream, wr io.WriteCloser, opts Encoder
 
 	byteBuf := make([]byte, 1024)
 	buf := make([]int8, 1024)
+
+	var bytesWritten int64
+	var segmentsPrinted int64
 
 	for {
 		offset := 0
@@ -47,5 +51,14 @@ func (e *PCMEncoder) Encode(stream audio.Stream, wr io.WriteCloser, opts Encoder
 		}
 
 		wr.Write(byteBuf)
+
+		if e.Verbose {
+			bytesWritten += int64(len(byteBuf))
+
+			if bytesWritten/(48000/20) > segmentsPrinted {
+				log.Printf("sent audio frame %d", segmentsPrinted)
+				segmentsPrinted++
+			}
+		}
 	}
 }
