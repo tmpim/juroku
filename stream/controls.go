@@ -198,7 +198,6 @@ func (s *StreamManager) PlaySource(meta *Metadata, rawInput interface{},
 
 			if len(frame.Audio) > 0 {
 				// go debugWr.Write([]byte(frame.Audio))
-				log.Println("sending audio:", len(frame.Audio))
 				s.Broadcast(SubscriptionAudio, append([]byte{PacketAudio, 0}, []byte(frame.Audio[:len(frame.Audio)/2])...))
 				s.Broadcast(SubscriptionAudio, append([]byte{PacketAudio, 1}, []byte(frame.Audio[len(frame.Audio)/2:])...))
 			}

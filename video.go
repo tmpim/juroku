@@ -105,9 +105,13 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 		})
 	}
 
-	chanBufSize := opts.Workers * 2
+	chanBufSize := opts.Workers * 4
 	if opts.GroupAudioNumFrames > opts.Workers {
-		chanBufSize = opts.GroupAudioNumFrames * 2
+		chanBufSize = opts.GroupAudioNumFrames * 4
+	}
+
+	if chanBufSize < 60 {
+		chanBufSize = 60
 	}
 
 	filename := "-"
@@ -122,7 +126,8 @@ func EncodeVideo(input interface{}, output chan<- VideoChunk,
 
 	wh := strconv.Itoa(opts.Width) + ":" + strconv.Itoa(opts.Height)
 	// args = append(args, "-f", "lavfi", "-i", "anullsrc", "-probesize", "32", "-analyzeduration", "0",
-	args = append(args, "-analyzeduration", "30000000", "-probesize", "50000000", "-i", filename, "-acodec", "pcm_s8",
+	args = append(args, "-analyzeduration", "30000000", "-probesize", "50000000", "-rtbufsize", "10M",
+		"-i", filename, "-bufsize", "10M", "-acodec", "pcm_s8",
 		"-f", "s8", "-ac", "1", "-ar", strconv.Itoa(opts.AudioEncoder.SampleRate()),
 		"pipe:3", "-f", "image2pipe", "-vcodec", "bmp",
 		"-r", strconv.Itoa(opts.Framerate), "-vf",
