@@ -20,6 +20,7 @@ import (
 	"github.com/1lann/dissonance/audio"
 	"github.com/1lann/dissonance/filters/samplerate"
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/tmpim/juroku"
@@ -33,13 +34,18 @@ const (
 	framerate = 20
 )
 
+type connWithMutex struct {
+	*websocket.Conn
+	mu sync.Mutex
+}
+
 var (
 	upgrader = websocket.Upgrader{
 		HandshakeTimeout: 5 * time.Second,
 	}
 
 	videoConnMutex = new(sync.Mutex)
-	videoConns     []*websocket.Conn
+	videoConns     []*connWithMutex
 
 	audioConnMutex = new(sync.Mutex)
 	audioConns     []*websocket.Conn
@@ -90,6 +96,7 @@ func main() {
 	e := echo.New()
 
 	e.Use(middleware.Logger())
+	pprof.Register(e)
 
 	e.GET("/audio", func(c echo.Context) error {
 		return c.HTML(http.StatusOK, audioHTML)
@@ -139,12 +146,14 @@ func main() {
 		}
 
 		videoConnMutex.Lock()
-		videoConns = append(videoConns, ws)
+		videoConns = append(videoConns, &connWithMutex{
+			Conn: ws,
+		})
 
 		defer func() {
 			videoConnMutex.Lock()
 			for i, conn := range videoConns {
-				if conn == ws {
+				if conn.Conn == ws {
 					videoConns[i] = videoConns[len(videoConns)-1]
 					videoConns = videoConns[:len(videoConns)-1]
 					break
@@ -251,7 +260,7 @@ func main() {
 			frame.WriteTo(buf)
 
 			videoConnMutex.Lock()
-			connState := make([]*websocket.Conn, len(videoConns))
+			connState := make([]*connWithMutex, len(videoConns))
 			copy(connState, videoConns)
 			videoConnMutex.Unlock()
 
@@ -260,7 +269,9 @@ func main() {
 				frameSeqer <- struct{}{}
 			}()
 			for _, conn := range connState {
+				conn.mu.Lock()
 				err := conn.WriteMessage(websocket.BinaryMessage, append([]byte{1}, buf.Bytes()...))
+				conn.mu.Unlock()
 				if err != nil {
 					conn.Close()
 				}
@@ -269,13 +280,22 @@ func main() {
 	})
 
 	var inputStream *audio.OfflineStream
+	var bootComplete atomic.Bool
 
 	core.OnAudioBuffer(1024, func(data []int16) {
+		if !bootComplete.Load() {
+			return
+		}
 		go func() {
 			byteData := make([]byte, len(data)*2)
 			for i, d := range data {
 				byteData[i*2] = byte(d & 0xff)
 				byteData[i*2+1] = byte(d >> 8)
+			}
+
+			monoAverage := make([]int16, len(data)/2)
+			for i := 0; i < len(data); i += 2 {
+				monoAverage[i/2] = (data[i] + data[i+1]) / 2
 			}
 
 			audioConnMutex.Lock()
@@ -295,7 +315,7 @@ func main() {
 				}
 			}
 
-			if err := inputStream.WriteValues(data); err != nil {
+			if err := inputStream.WriteValues(monoAverage); err != nil {
 				log.Printf("failed to write to input audio stream: %v", err)
 			}
 		}()
@@ -321,6 +341,7 @@ func main() {
 
 	eg.Go(func() error {
 		sampleRateFilter := samplerate.NewFilter(encoder.SampleRate()).Filter(inputStream)
+		log.Println("output sample rate:", sampleRateFilter.SampleRate())
 		return encoder.Encode(sampleRateFilter, audioEncWr, juroku.EncoderOptions{})
 	})
 
@@ -333,25 +354,27 @@ func main() {
 			}
 
 			videoConnMutex.Lock()
-			connState := make([]*websocket.Conn, len(videoConns))
+			connState := make([]*connWithMutex, len(videoConns))
 			copy(connState, videoConns)
 			videoConnMutex.Unlock()
 
-			<-ccAudioSeqer
-			defer func() {
-				ccAudioSeqer <- struct{}{}
-			}()
+			go func() {
+				<-ccAudioSeqer
+				defer func() {
+					ccAudioSeqer <- struct{}{}
+				}()
 
-			for _, conn := range connState {
-				err := conn.WriteMessage(websocket.BinaryMessage, append([]byte{2}, frameAudio...))
-				if err != nil {
-					conn.Close()
+				for _, conn := range connState {
+					conn.mu.Lock()
+					err := conn.WriteMessage(websocket.BinaryMessage, append([]byte{2}, frameAudio...))
+					conn.mu.Unlock()
+					if err != nil {
+						conn.Close()
+					}
 				}
-			}
+			}()
 		}
 	})
-
-	var bootComplete atomic.Bool
 
 	e.GET("/healthz", func(c echo.Context) error {
 		if ctx.Err() != nil {

@@ -1,23 +1,9 @@
-
-local Decoder = require("jurokunext")
-
-local JUROKU_VIDEO = ".../api/ws/video"
 local JUROKU_CONTROL = ".../api/ws/control/0"
 
 local name, dp = debug.getupvalue(peripheral.getNames, 2)
 if name ~= "native" then
   error("failed to get direct peripheral access")
 end
-
-local function wrapPeriph(side)
-  local call = dp.call
-  return function(method, ...)
-    return call(side, method, ...)
-  end
-end
-
-local monitors = { wrapPeriph("top") }
-local speaker = peripheral.wrap("front")
 
 -- local monitors = {
 --   wrapRemote("monitor_576", "bottom"),
@@ -60,51 +46,12 @@ local keyBindings = {
   [keys.rightShift] = joy.select
 }
 
-local function clearMonitors()
-  for k, m in pairs(monitors) do
-    local w, h = m("getSize")
-    m("setPaletteColour", colours.black, 0x000000)
-    m("setBackgroundColour", colours.black)
-    m("clear")
-    m("setTextScale", 0.5)
-    m("setCursorPos", 1, 1)
-  end
-end
-
-local function playAudio(data)
-  if #data == 0 then
-    return true
-  end
-  local tabular = {}
-  for i = 1, #data do
-  local val = data:byte(i)
-  if val > 127 then
-    val = val - 256
-  end
-  tabular[i] = val
-  end
-
-  return speaker.playAudio(tabular)
-end
-
 local function run()
-  clearMonitors()
   print("Connecting")
-
-  local videoWS, err = http.websocket(JUROKU_VIDEO)
-  if not videoWS then
-    error(err)
-  end
 
   local controlWS, err = http.websocket(JUROKU_CONTROL)
   if not controlWS then
     error(err)
-  end
-
-  local decoder = Decoder.new(monitors)
-
-  for k, v in pairs(decoder) do
-    print(k)
   end
 
   local isEmpty = true
@@ -120,19 +67,6 @@ local function run()
       os.reboot()
     elseif event == "websocket_closed" then
       os.reboot()
-    elseif event == "websocket_message" and url == JUROKU_VIDEO then
-      if e[3]:byte(1) == 1 then
-        decoder:renderNextMonitor(0, e[3]:sub(2))
-      elseif e[3]:byte(1) == 2 then
-        buffer = buffer .. e[3]:sub(2)
-        if isEmpty then
-          if not playAudio(buffer) then
-            isEmpty = false
-          else
-            buffer = ""
-          end
-        end
-      end
     elseif event == "key" and not e[3] and keyBindings[e[2]] ~= nil then
       -- key down and not being held
         controlWS.send(keyBindings[e[2]] .. " 1")
@@ -152,7 +86,5 @@ local function run()
 end
 
 run()
-
-clearMonitors()
 
 print("Stream ended or something")
